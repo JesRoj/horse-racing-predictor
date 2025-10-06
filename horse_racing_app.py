@@ -99,53 +99,88 @@ class UniversalHorseRacingPredictor:
         
         return " | ".join(analysis) if analysis else "📊 Standard"
 
+def clean_text_for_parsing(text):
+    """Clean text by removing problematic characters"""
+    # Replace special characters
+    text = text.replace('³', '3').replace('²', '2').replace('¹', '1')
+    text = text.replace('½', '0.5').replace('¼', '0.25').replace('¾', '0.75')
+    text = text.replace('🇬', '').replace('🏇', '').replace('💰', '')
+    text = text.replace('①', '1').replace('②', '2').replace('③', '3')
+    text = text.replace('📛', '').replace('🔳', '').replace('🚫', '')
+    
+    # Remove other emoji and special symbols
+    import re
+    # Remove emoji
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags=re.UNICODE)
+    text = emoji_pattern.sub(r'', text)
+    
+    return text
+
 def extract_venezuelan_racing_data(text_content):
-    """Specialized extractor for Venezuelan racing format"""
+    """Specialized extractor for Venezuelan racing format - Fixed version"""
+    text_content = clean_text_for_parsing(text_content)
     horses = []
     lines = text_content.strip().split('\n')
     
-    # Look for horse names in CAPS followed by numbers
+    # Look for horse names and numbers more carefully
     for line in lines:
         line = line.strip()
         if not line or len(line) < 10:
             continue
             
-        # Find horse names (usually in CAPS)
+        # Split into words
         words = line.split()
+        if len(words) < 3:
+            continue
+            
+        # Look for patterns like: NUMBER NAME WEIGHT OTHER_NUMBERS
         horse_name = ""
         numbers_found = []
         post_position = None
         weight = None
-        recent_form = []
         
+        # First, extract all numbers safely
         for word in words:
-            # Clean the word
             clean_word = word.strip('.,;[](){}')
             
-            # Check if it's a horse name (letters, reasonable length)
-            if (clean_word.isalpha() and 
-                len(clean_word) >= 3 and 
-                clean_word.isupper() and
-                not clean_word.isdigit()):
+            # Try to convert to number
+            try:
+                # Handle decimals
+                if '.' in clean_word:
+                    num = float(clean_word)
+                    if num == int(num):  # Whole number
+                        numbers_found.append(int(num))
+                    continue
                 
-                if not horse_name:
-                    horse_name = clean_word
-                elif len(horse_name.split()) < 3:  # Max 3 words for name
-                    horse_name += " " + clean_word
-            
-            # Check if it's a number
-            elif clean_word.replace('.', '').isdigit():
-                num = int(clean_word.replace('.', ''))
-                if 1 <= num <= 20:  # Reasonable racing number
-                    numbers_found.append(num)
+                # Try integer conversion
+                num = int(clean_word)
+                numbers_found.append(num)
+                
+            except ValueError:
+                # This is text, could be horse name
+                if (clean_word.isalpha() and 
+                    len(clean_word) >= 3 and 
+                    len(horse_name.split()) < 4):  # Max 4 words
+                    
+                    if horse_name:
+                        horse_name += " " + clean_word
+                    else:
+                        horse_name = clean_word
         
-        # If we found a horse name and some numbers
+        # If we found a horse name and numbers
         if horse_name and len(numbers_found) >= 2:
-            # First number is usually post position or weight
-            post_position = numbers_found[0] if numbers_found[0] <= 20 else len(horses) + 1
-            weight = numbers_found[1] if numbers_found[1] <= 60 else 55
+            # First number is usually post position
+            post_position = numbers_found[0] if 1 <= numbers_found[0] <= 20 else len(horses) + 1
             
-            # Use next few numbers as recent form
+            # Second number is usually weight
+            weight = numbers_found[1] if 10 <= numbers_found[1] <= 70 else 55
+            
+            # Use next numbers as recent form
             recent_form = []
             for num in numbers_found[2:7]:
                 if 1 <= num <= 20:
@@ -159,63 +194,73 @@ def extract_venezuelan_racing_data(text_content):
                     'recent_finishes': recent_form[:5],
                     'jockey_win_percentage': 0.12,
                     'trainer_win_percentage': 0.15,
-                    'field_size': len([l for l in lines if len(l.strip()) > 10 and any(c.isupper() for c in l)]),
+                    'field_size': len([l for l in lines if len(l.strip()) > 10]),
                     'race_distance': 8.0,
                     'track_condition': 'fast',
                     'speed_rating': 75
                 }
                 horses.append(horse_data)
     
-    # If no horses found with the above method, try simpler approach
+    # If no horses found, try simpler approach
     if not horses:
-        for i, line in enumerate(lines):
-            # Look for any line with mixed case and numbers
-            if (len(line.strip()) > 10 and 
-                any(c.isalpha() for c in line) and 
-                any(c.isdigit() for c in line)):
+        # Look for any line with text and numbers
+        valid_lines = [l for l in lines if len(l.strip()) > 10]
+        for i, line in enumerate(valid_lines[:20]):
+            words = line.split()
+            
+            # Find first word that looks like a name
+            horse_name = ""
+            numbers = []
+            
+            for word in words:
+                clean_word = word.strip('.,;[](){}')
                 
-                # Extract first word as potential horse name
-                words = line.split()
-                if words:
-                    horse_name = words[0]
-                    if len(horse_name) >= 3 and any(c.isalpha() for c in horse_name):
-                        
-                        # Extract numbers
-                        numbers = []
-                        for word in words[1:]:
-                            clean_num = word.replace('.', '').replace(',', '')
-                            if clean_num.isdigit():
-                                num = int(clean_num)
-                                if 1 <= num <= 20:
-                                    numbers.append(num)
-                        
-                        if len(numbers) >= 2:
-                            horse_data = {
-                                'name': horse_name,
-                                'post_position': len(horses) + 1,
-                                'weight': numbers[0] if numbers[0] <= 60 else 55,
-                                'recent_finishes': numbers[1:4] if len(numbers) > 1 else [5, 5, 5],
-                                'jockey_win_percentage': 0.12,
-                                'trainer_win_percentage': 0.15,
-                                'field_size': len([l for l in lines if len(l.strip()) > 10]),
-                                'race_distance': 8.0,
-                                'track_condition': 'fast',
-                                'speed_rating': 75
-                            }
-                            horses.append(horse_data)
+                # Try as number first
+                try:
+                    if '.' in clean_word:
+                        num = float(clean_word)
+                        if num == int(num):
+                            numbers.append(int(num))
+                    else:
+                        num = int(clean_word)
+                        numbers.append(num)
+                except ValueError:
+                    # It's text - use as horse name if reasonable
+                    if (clean_word.isalpha() and 
+                        len(clean_word) >= 3 and 
+                        not horse_name):
+                        horse_name = clean_word
+            
+            if horse_name and len(numbers) >= 2:
+                horse_data = {
+                    'name': horse_name,
+                    'post_position': len(horses) + 1,
+                    'weight': numbers[0] if 10 <= numbers[0] <= 70 else 55,
+                    'recent_finishes': numbers[1:4] if len(numbers) > 1 else [5, 5, 5],
+                    'jockey_win_percentage': 0.12,
+                    'trainer_win_percentage': 0.15,
+                    'field_size': len(valid_lines),
+                    'race_distance': 8.0,
+                    'track_condition': 'fast',
+                    'speed_rating': 75
+                }
+                horses.append(horse_data)
     
     return horses[:20]
 
 def extract_simple_racing_data(text_content):
     """Simple racing data extraction"""
+    # Clean the text first
+    cleaned_text = clean_text_for_parsing(text_content)
+    
     # Try Venezuelan format first
-    venezuelan_horses = extract_venezuelan_racing_data(text_content)
+    venezuelan_horses = extract_venezuelan_racing_data(cleaned_text)
     if venezuelan_horses:
         return venezuelan_horses
     
     # Fallback to universal simple extraction
     horses = []
-    lines = text_content.strip().split('\n')
+    lines = cleaned_text.strip().split('\n')
     
     # Simple extraction for any format
     valid_lines = [l for l in lines if len(l.strip()) > 10 and any(c.isalpha() for c in l) and any(c.isdigit() for c in l)]
@@ -228,22 +273,27 @@ def extract_simple_racing_data(text_content):
         for word in words:
             clean_word = word.strip('.,;[](){}')
             
-            # Check for horse name (letters)
-            if clean_word.isalpha() and len(clean_word) >= 3:
-                if not horse_name:
-                    horse_name = clean_word
-            
-            # Check for numbers
-            elif clean_word.replace('.', '').isdigit():
-                num = int(clean_word.replace('.', ''))
-                if 1 <= num <= 20:
+            # Try as number first
+            try:
+                if '.' in clean_word:
+                    num = float(clean_word)
+                    if num == int(num):
+                        numbers.append(int(num))
+                else:
+                    num = int(clean_word)
                     numbers.append(num)
+            except ValueError:
+                # It's text - use as horse name if reasonable
+                if (clean_word.isalpha() and 
+                    len(clean_word) >= 3 and 
+                    not horse_name):
+                    horse_name = clean_word
         
         if horse_name and len(numbers) >= 2:
             horse_data = {
                 'name': horse_name,
                 'post_position': len(horses) + 1,
-                'weight': numbers[0] if numbers[0] <= 60 else 55,
+                'weight': numbers[0] if 10 <= numbers[0] <= 70 else 55,
                 'recent_finishes': numbers[1:4] if len(numbers) > 1 else [5, 5, 5],
                 'jockey_win_percentage': 0.12,
                 'trainer_win_percentage': 0.15,
@@ -258,7 +308,7 @@ def extract_simple_racing_data(text_content):
 
 def main():
     st.title("🏇 Universal Horse Racing Predictor")
-    st.subheader("📄 Upload Racing Document - Fixed Version")
+    st.subheader("📄 Fixed for Special Characters & Encoding Issues")
 
     # Race setup
     with st.sidebar:
@@ -274,22 +324,23 @@ def main():
         st.header("📄 Upload Racing Document")
         
         st.markdown("""
-        ### 🌍 Fixed for Venezuelan Racing:
-        - **La Rinconada** - Perfect extraction
-        - **Valencia** - Full support
-        - **Any Venezuelan track** - Optimized parsing
-        - **Universal formats** - Still works worldwide
+        ### 🔧 Fixed for Encoding Issues:
+        - **Special characters** (³, ², ¹, ½, ¼, ¾)
+        - **Emoji symbols** (🇬, 📛, 🔳)
+        - **Fraction symbols** (①, ②, ③)
+        - **Venezuelan racing format** optimized
+        - **Universal compatibility** maintained
         """)
 
         # File upload
         uploaded_file = st.file_uploader(
             "📁 Choose racing file (PDF, TXT, CSV)",
             type=['pdf', 'txt', 'csv'],
-            help="Optimized for Venezuelan racing programs"
+            help="Fixed for special characters and encoding issues"
         )
 
         if uploaded_file is not None:
-            with st.spinner("🔍 Reading racing document..."):
+            with st.spinner("🔍 Reading racing document with character fix..."):
                 text_content = ""
                 try:
                     # Read file content with multiple encoding attempts
@@ -304,14 +355,17 @@ def main():
                             continue
                     
                     if text_content:
-                        st.success("✅ File read successfully!")
+                        # Clean the text for parsing
+                        text_content = clean_text_for_parsing(text_content)
+                        
+                        st.success("✅ File read and cleaned successfully!")
                         
                         # Show preview
-                        with st.expander("👀 Preview extracted text"):
+                        with st.expander("👀 Preview cleaned text"):
                             preview = text_content[:500] + "..." if len(text_content) > 500 else text_content
                             st.text(preview)
                         
-                        # Extract horses using improved parser
+                        # Extract horses with improved parser
                         horses = extract_venezuelan_racing_data(text_content)
                         
                         if horses:
@@ -320,7 +374,7 @@ def main():
                             # Show extracted horses
                             with st.expander("📋 View extracted horses"):
                                 for i, horse in enumerate(horses, 1):
-                                    col_h1, col_h2 = st.columns(2)
+                                    col_h1, col_h2 = st.columns([1, 1])
                                     with col_h1:
                                         st.write(f"**{i}. {horse['name']}**")
                                         st.caption(f"Post: {horse['post_position']} | Weight: {horse['weight']}kg")
@@ -338,10 +392,10 @@ def main():
                 except Exception as e:
                     st.error(f"❌ Error reading file: {str(e)}")
 
-        # Manual input - Venezuelan optimized
-        st.markdown("### 📝 Manual Input - Venezuelan Optimized")
+        # Manual input - Fixed
+        st.markdown("### 📝 Manual Input - Character Safe")
         st.markdown("""
-        **Copy directly from Venezuelan racing programs:**
+        **Copy directly from racing programs - handles special characters:**
         
         **Format:** HorseName PostPosition Weight RecentForm
         **Example:** MULTIVERSO 8 55 1;2;1
@@ -363,17 +417,17 @@ MISTICA 11 53 4;2;1
 COACH SESSA 12 56 1;2;3"""
 
         manual_input = st.text_area(
-            "📋 Paste Venezuelan racing data:",
+            "📋 Paste racing data (special characters safe):",
             value=venezuelan_sample,
             height=200,
-            help="Copy directly from La Rinconada race programs"
+            help="Handles special characters like ³, ², ¹, ½, ¼, ¾, emoji, etc."
         )
         
         if st.button("🚀 Analyze Manual Input", type="primary"):
             horses = extract_venezuelan_racing_data(manual_input)
             if horses:
                 st.session_state.horses = horses
-                st.success(f"✅ Loaded {len(horses)} Venezuelan horses!")
+                st.success(f"✅ Loaded {len(horses)} horses!")
                 st.rerun()
             else:
                 st.error("❌ Could not parse. Use format: HorseName Post Weight Form")
@@ -398,7 +452,7 @@ COACH SESSA 12 56 1;2;3"""
 
     # AI Analysis Section
     if 'horses' in st.session_state and len(st.session_state.horses) >= 2:
-        st.header("🔮 Venezuelan AI Race Analysis")
+        st.header("🔮 Fixed AI Race Analysis")
         
         predictor = UniversalHorseRacingPredictor()
         
@@ -452,26 +506,6 @@ COACH SESSA 12 56 1;2;3"""
                 st.write(f"**Analysis:** {horse['Analysis']}")
                 st.divider()
 
-        # Betting Strategy
-        st.header("💰 AI Betting Recommendations")
-        
-        col_bet1, col_bet2, col_bet3 = st.columns(3)
-        
-        with col_bet1:
-            favorite = predictions[0]
-            st.metric("🏆 Win Bet", favorite['Horse'], f"{favorite['Win_Probability']}%")
-        
-        with col_bet2:
-            if len(predictions) > 1:
-                place_horse = predictions[1] if predictions[1]['Win_Probability'] > 10 else predictions[0]
-                st.metric("💎 Place/Show", place_horse['Horse'], f"{place_horse['Win_Probability']}%")
-        
-        with col_bet3:
-            longshots = [p for p in predictions if 5 < p['Win_Probability'] < 15]
-            if longshots:
-                longshot = longshots[-1]
-                st.metric("🚀 Longshot", longshot['Horse'], f"{longshot['Win_Probability']}%")
-
         # Fixed CSV Export
         st.header("📁 Export Predictions")
         
@@ -492,7 +526,7 @@ COACH SESSA 12 56 1;2;3"""
         st.download_button(
             label="📊 Download Predictions CSV",
             data=csv_content,
-            file_name=f"venezuelan_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
 
@@ -500,8 +534,8 @@ COACH SESSA 12 56 1;2;3"""
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>🏇 Venezuelan Horse Racing AI - Optimized for La Rinconada & Universal Tracks</p>
-        <p>Fixed text extraction • Proper name parsing • Working CSV export</p>
+        <p>🏇 Fixed Horse Racing AI - Handles Special Characters & Encoding</p>
+        <p>Fraction symbols • Emoji • Special characters • Venezuelan optimized</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
     """, unsafe_allow_html=True)
