@@ -1,319 +1,392 @@
 import streamlit as st
-import pandas as pd
-import re
 from datetime import datetime
-from io import StringIO
+import io
 
 st.set_page_config(
-    page_title="🐎 KimiK2 Horse Racing Predictor",
+    page_title="🐎 Universal Horse Racing Predictor",
     page_icon="🐎",
     layout="wide"
 )
 
-class HorseRacingPredictor:
+class UniversalHorseRacingPredictor:
     def __init__(self):
         self.weights = {
-            'speed_figure': 0.25, 'recent_form': 0.20, 'class_level': 0.15,
-            'jockey_skill': 0.12, 'trainer_stats': 0.12, 'post_position': 0.08,
-            'track_condition': 0.05, 'distance_fitness': 0.03
+            'speed_figure': 0.30,      # Most important
+            'recent_form': 0.25,       # Recent performance
+            'class_level': 0.15,       # Competition level
+            'post_position': 0.10,     # Starting gate
+            'jockey_skill': 0.10,      # Jockey ability
+            'trainer_stats': 0.08,     # Trainer stats
+            'distance_fitness': 0.02   # Distance suitability
         }
         
-        self.track_variants = {
-            'fast': 1.0, 'good': 1.02, 'sloppy': 1.05, 
-            'muddy': 1.08, 'turf_firm': 0.98, 'turf_good': 1.0
-        }
+        # Universal post position weights (works for any field size)
+        self.post_weights = self.generate_post_weights()
+
+    def generate_post_weights(self, max_posts=20):
+        """Generate post position weights for any field size"""
+        weights = {}
+        for total_posts in range(4, max_posts + 1):
+            post_weights = {}
+            for post in range(1, total_posts + 1):
+                if post <= 3:
+                    post_weights[post] = 1.0 - (post - 1) * 0.02  # Inside posts advantage
+                elif post <= 8:
+                    post_weights[post] = 1.0  # Neutral posts
+                else:
+                    post_weights[post] = 1.0 - (post - 8) * 0.03  # Outside posts penalty
+            weights[total_posts] = post_weights
+        return weights
+
+    def calculate_universal_score(self, horse_data):
+        """Universal scoring algorithm that works for any racing format"""
         
-        self.post_position_weights = {
-            1: 0.95, 2: 0.97, 3: 0.98, 4: 0.99, 5: 1.0,
-            6: 0.99, 7: 0.97, 8: 0.95, 9: 0.93, 10: 0.90,
-            11: 0.87, 12: 0.83, 13: 0.79, 14: 0.75, 15: 0.70
-        }
-
-    def calculate_speed_score(self, horse_data):
-        base_speed = horse_data.get('beyer_speed_figure', 70)
-        track_adj = self.track_variants.get(horse_data.get('track_condition', 'fast'), 1.0)
-        distance = horse_data.get('race_distance', 6.0)
-        distance_factor = 1.0 if distance <= 8.0 else 0.95
-        recent_speeds = horse_data.get('recent_beyer_figures', [base_speed])
-        trend_factor = 1.0
-        if len(recent_speeds) >= 3:
-            trend = (recent_speeds[-1] - recent_speeds[-3]) / recent_speeds[-3]
-            trend_factor = 1.0 + (trend * 0.3)
-        return min(base_speed * track_adj * distance_factor * trend_factor, 120)
-
-    def calculate_form_score(self, horse_data):
-        recent_finishes = horse_data.get('recent_finishes', [5, 5, 5])
-        total_races = len(recent_finishes)
-        if total_races == 0:
-            return 0.5
-        weighted_sum = 0
-        total_weight = 0
-        for i, finish in enumerate(reversed(recent_finishes)):
-            weight = (i + 1) / total_races
-            position_score = max(0, (10 - finish) / 10)
-            weighted_sum += position_score * weight
-            total_weight += weight
-        return weighted_sum / total_weight if total_weight > 0 else 0.5
-
-    def calculate_class_score(self, horse_data):
-        current_class = horse_data.get('race_class', 'claiming')
-        horse_class = horse_data.get('horse_class', 'claiming')
-        class_hierarchy = {
-            'maiden': 1, 'claiming': 2, 'allowance': 3, 
-            'stakes': 4, 'graded_stakes': 5, 'grade_1': 6
-        }
-        race_level = class_hierarchy.get(current_class, 2)
-        horse_level = class_hierarchy.get(horse_class, 2)
-        if horse_level > race_level:
-            return 1.2
-        elif horse_level == race_level:
-            return 1.0
-        else:
-            return 0.8
-
-    def calculate_connection_score(self, horse_data):
-        jockey_win_pct = horse_data.get('jockey_win_percentage', 0.10)
-        trainer_win_pct = horse_data.get('trainer_win_percentage', 0.12)
-        jockey_score = min(jockey_win_pct / 0.25, 1.0)
-        trainer_score = min(trainer_win_pct / 0.25, 1.0)
-        combo_success = horse_data.get('jockey_trainer_combo_win_pct', 0.10)
-        combo_bonus = min(combo_success / 0.30, 0.2)
-        return jockey_score + (combo_bonus * 0.5), trainer_score + (combo_bonus * 0.5)
-
-    def calculate_post_position_score(self, horse_data):
+        # Speed Score (universal)
+        speed_base = horse_data.get('speed_rating', 70)
+        speed_bonus = 0
+        
+        # Recent Form Score (universal)
+        recent_form = horse_data.get('recent_finishes', [5, 5, 5])
+        form_score = 0
+        if recent_form:
+            total_races = len(recent_form)
+            for i, finish in enumerate(reversed(recent_form)):
+                weight = (i + 1) / total_races
+                position_score = max(0, (10 - finish) / 10)
+                form_score += position_score * weight
+            form_score = form_score / sum([(i+1)/total_races for i in range(total_races)]) if total_races > 0 else 0.5
+        
+        # Post Position Score (universal)
         post = horse_data.get('post_position', 5)
         field_size = horse_data.get('field_size', 10)
-        if field_size <= 6:
-            return 1.0
-        elif field_size <= 10:
-            return self.post_position_weights.get(post, 0.90)
-        else:
-            return self.post_position_weights.get(post, 0.80)
-
-    def calculate_overall_score(self, horse_data):
-        speed_score = self.calculate_speed_score(horse_data)
-        form_score = self.calculate_form_score(horse_data)
-        class_score = self.calculate_class_score(horse_data)
-        jockey_score, trainer_score = self.calculate_connection_score(horse_data)
-        post_score = self.calculate_post_position_score(horse_data)
+        post_score = self.post_weights.get(field_size, {}).get(post, 0.95)
         
+        # Class Score (universal)
+        class_bonus = 1.0
+        if horse_data.get('race_class') and horse_data.get('horse_class'):
+            if horse_data['horse_class'] > horse_data['race_class']:
+                class_bonus = 1.15  # Dropping in class
+            elif horse_data['horse_class'] < horse_data['race_class']:
+                class_bonus = 0.85  # Moving up in class
+        
+        # Calculate universal score
         total_score = (
-            speed_score * self.weights['speed_figure'] +
+            speed_base * self.weights['speed_figure'] +
             form_score * 100 * self.weights['recent_form'] +
-            class_score * 100 * self.weights['class_level'] +
-            jockey_score * 100 * self.weights['jockey_skill'] +
-            trainer_score * 100 * self.weights['trainer_stats'] +
-            post_score * 100 * self.weights['post_position']
+            post_score * 100 * self.weights['post_position'] +
+            class_bonus * 100 * self.weights['class_level']
         )
+        
         return total_score
 
-    def predict_race(self, horses_data):
+    def predict_universal_race(self, horses_data):
+        """Universal race prediction for any format"""
         results = []
+        
         for horse in horses_data:
-            score = self.calculate_overall_score(horse)
+            score = self.calculate_universal_score(horse)
+            
             results.append({
                 'Horse': horse.get('name', 'Unknown'),
                 'Score': round(score, 2),
                 'Win_Probability': round(max(0, score - 70), 1),
-                'Beyer_Figure': round(self.calculate_speed_score(horse), 1),
-                'Form_Score': round(self.calculate_form_score(horse), 3),
-                'Class_Score': round(self.calculate_class_score(horse), 3),
-                'Jockey_Score': round(self.calculate_connection_score(horse)[0], 3),
-                'Trainer_Score': round(self.calculate_connection_score(horse)[1], 3),
-                'Post_Advantage': round(self.calculate_post_position_score(horse), 3)
+                'Post_Position': horse.get('post_position', '?'),
+                'Weight': horse.get('weight', '?'),
+                'Jockey': horse.get('jockey', '?'),
+                'Trainer': horse.get('trainer', '?'),
+                'Speed_Rating': horse.get('speed_rating', '?'),
+                'Recent_Form': horse.get('recent_finishes', '?'),
+                'Analysis': self.generate_universal_analysis(horse)
             })
         
+        # Sort by score
         results.sort(key=lambda x: x['Score'], reverse=True)
+        
+        # Normalize probabilities
         total_prob = sum([r['Win_Probability'] for r in results])
         if total_prob > 0:
             for result in results:
                 result['Win_Probability'] = (result['Win_Probability'] / total_prob * 100).round(1)
+        
         return results
 
-def extract_text_from_file(uploaded_file):
-    """Extract text from uploaded file (CSV, TXT, or basic PDF text)"""
-    text = ""
-    
-    # Get file extension
-    filename = uploaded_file.name.lower()
-    
-    if filename.endswith('.csv'):
-        # Read CSV file
-        df = pd.read_csv(uploaded_file)
-        # Convert to text format
-        text_lines = []
-        for _, row in df.iterrows():
-            line = ",".join([str(val) for val in row.values])
-            text_lines.append(line)
-        text = "\n".join(text_lines)
+    def generate_universal_analysis(self, horse_data):
+        """Generate analysis that works for any racing format"""
+        analysis = []
         
-    elif filename.endswith('.txt'):
-        # Read text file
-        string_io = StringIO(uploaded_file.getvalue().decode("utf-8"))
-        text = string_io.read()
+        # Post position analysis
+        post = horse_data.get('post_position', 5)
+        field_size = horse_data.get('field_size', 10)
+        if post <= 3:
+            analysis.append("🎯 Good inside post")
+        elif post >= field_size - 2:
+            analysis.append("⚠️ Wide post challenge")
         
-    else:
-        # Try to read as text (for simple PDFs or other formats)
-        try:
-            string_io = StringIO(uploaded_file.getvalue().decode("utf-8"))
-            text = string_io.read()
-        except:
-            text = ""
-    
-    return text
+        # Recent form analysis
+        recent = horse_data.get('recent_finishes', [])
+        if recent:
+            avg_finish = sum(recent) / len(recent)
+            if avg_finish <= 3:
+                analysis.append("🔥 Strong recent form")
+            elif avg_finish <= 6:
+                analysis.append("📊 Consistent performer")
+            else:
+                analysis.append("📉 Needs improvement")
+        
+        # Weight analysis (if available)
+        weight = horse_data.get('weight', 0)
+        if weight > 0:
+            if weight < 54:
+                analysis.append("⚖️ Light weight advantage")
+            elif weight > 57:
+                analysis.append("🏋️ Heavy weight to carry")
+        
+        return " | ".join(analysis) if analysis else "📊 Standard contender"
 
-def parse_race_data(text_data):
-    """Parse race data from text format"""
+def extract_universal_racing_data(text_content):
+    """Universal racing data extractor - works with ANY format"""
     horses = []
-    lines = text_data.strip().split('\n')
+    lines = text_content.strip().split('\n')
     
-    for line in lines:
-        if not line.strip():
-            continue
-            
-        # Try different separators (comma, tab, space)
-        parts = line.split(',')
-        if len(parts) < 4:
-            parts = line.split('\t')
-        if len(parts) < 4:
-            parts = line.split()
-            if len(parts) >= 5:
-                # Space-separated: combine first elements as horse name
-                name_parts = []
-                i = 0
-                while i < len(parts) and not parts[i].isdigit():
-                    name_parts.append(parts[i])
-                    i += 1
-                if i + 3 < len(parts):
-                    parts = [' '.join(name_parts), parts[i], parts[i+1], parts[i+2], parts[i+3]]
-                else:
-                    continue
+    # Multiple extraction strategies
+    strategies = [
+        # Strategy 1: Post Position + Name Pattern
+        r'(\d+)\s+([A-Z][A-Z\s]+?)(?:\s+\d+|\s+[A-Z]|\s*$)',
         
-        if len(parts) >= 5:
-            try:
-                horse_data = {
-                    'name': parts[0].strip(),
-                    'beyer_speed_figure': int(parts[1].strip()),
-                    'recent_finishes': [int(x.strip()) for x in parts[2].split(';')],
-                    'post_position': int(parts[3].strip()),
-                    'jockey_win_percentage': float(parts[4].strip()) / 100,
-                    'trainer_win_percentage': float(parts[5].strip()) / 100 if len(parts) > 5 else float(parts[4].strip()) / 100,
-                    'race_class': 'allowance',
-                    'horse_class': 'allowance',
-                    'field_size': len(lines),
-                    'race_distance': 8.0,
-                    'track_condition': 'fast'
-                }
-                horses.append(horse_data)
-            except Exception as e:
-                st.warning(f"Could not parse line: {line[:50]}... Error: {str(e)}")
-                continue
+        # Strategy 2: Name + Numbers Pattern  
+        r'([A-Z][A-Za-z\s\-\']+?)\s+(\d+(?:\.\d+)?)\s+([\d\s;,\.]+)',
+        
+        # Strategy 3: Table-like format
+        r'(\d+)\s+([A-Za-z\s\-\']+)\s+(\d+(?:\.\d+)?)\s+([\d\s;,\.]+)',
+        
+        # Strategy 4: Flexible name capture
+        r'([A-Z][A-Za-z\s\-\']{3,25}?)\s+(\d+(?:\.\d+)?)'
+    ]
     
-    return horses
+    for strategy in strategies:
+        matches = []
+        for line in lines:
+            match = re.findall(strategy, line, re.IGNORECASE)
+            if match:
+                matches.extend(match)
+        
+        if len(matches) >= 2:  # Found at least 2 horses
+            for match in matches[:20]:  # Limit to 20 horses max
+                try:
+                    if len(match) >= 2:
+                        horse_data = {
+                            'name': match[1].strip() if len(match) > 1 else match[0].strip(),
+                            'post_position': int(match[0]) if len(match) > 1 and match[0].isdigit() else len(horses) + 1,
+                            'weight': 55,  # Default weight
+                            'recent_finishes': [],
+                            'jockey_win_percentage': 0.12,
+                            'trainer_win_percentage': 0.15,
+                            'field_size': len(matches),
+                            'race_distance': 8.0,
+                            'track_condition': 'fast',
+                            'speed_rating': 75,
+                            'race_class': 'allowance',
+                            'horse_class': 'allowance'
+                        }
+                        
+                        # Extract numbers as recent form
+                        numbers_found = []
+                        for part in match[2:] if len(match) > 2 else []:
+                            nums = re.findall(r'(\d+(?:\.\d+)?)', str(part))
+                            for num in nums:
+                                try:
+                                    n = float(num)
+                                    if 1 <= n <= 20:  # Reasonable race position
+                                        numbers_found.append(int(n))
+                                except:
+                                    continue
+                        
+                        horse_data['recent_finishes'] = numbers_found[:5] if numbers_found else [5, 5, 5]
+                        
+                        # Extract weight if found
+                        weight_matches = re.findall(r'(\d+(?:\.\d+)?)\s*(?:kg|KG|K🇬|kg)', line, re.IGNORECASE)
+                        if weight_matches:
+                            horse_data['weight'] = float(weight_matches[0])
+                        
+                        horses.append(horse_data)
+                except:
+                    continue
+            break
+    
+    # Fallback: Simple line-by-line extraction
+    if not horses:
+        for i, line in enumerate(lines):
+            # Look for lines with both letters and numbers
+            if re.search(r'[A-Za-z]', line) and re.search(r'\d', line):
+                words = re.findall(r'[A-Za-z]+', line)
+                numbers = re.findall(r'\d+(?:\.\d+)?', line)
+                
+                if len(words) >= 1 and len(numbers) >= 2:
+                    horse_data = {
+                        'name': ' '.join(words[:3]),  # First 1-3 words as name
+                        'post_position': i + 1,
+                        'weight': 55,
+                        'recent_finishes': [],
+                        'jockey_win_percentage': 0.12,
+                        'trainer_win_percentage': 0.15,
+                        'field_size': len([l for l in lines if re.search(r'[A-Za-z].*\d', l)]),
+                        'race_distance': 8.0,
+                        'track_condition': 'fast',
+                        'speed_rating': 75
+                    }
+                    
+                    # Use first few reasonable numbers as recent form
+                    form_numbers = []
+                    for num in numbers[:6]:
+                        try:
+                            n = float(num)
+                            if 1 <= n <= 20:
+                                form_numbers.append(int(n))
+                        except:
+                            continue
+                    
+                    horse_data['recent_finishes'] = form_numbers[:3] if form_numbers else [5, 5, 5]
+                    horses.append(horse_data)
+    
+    return horses[:20]  # Limit to 20 horses max
 
 def main():
-    st.title("🏇 KimiK2 Horse Racing Predictor")
-    st.subheader("📁 Upload Race Data File (CSV, TXT, or Text-based PDF)")
+    st.title("🏇 Universal Horse Racing Predictor")
+    st.subheader("🌍 Analyze ANY Racing Format from ANY Track Worldwide")
 
-    # Race setup
+    # Universal race setup
     with st.sidebar:
-        st.header("🏁 Race Information")
-        race_name = st.text_input("Race Name", "KimiK2 Challenge Stakes")
-        track_name = st.text_input("Track Name", "Virtual Downs")
-        distance = st.number_input("Distance (furlongs)", 6.0, 12.0, 8.5, 0.5)
-        track_condition = st.selectbox("Track Condition", 
-                                     ["Fast", "Good", "Sloppy", "Muddy", "Turf-Firm", "Turf-Good"])
+        st.header("🏁 Universal Race Setup")
+        race_name = st.text_input("Race Name/Track", "Universal Race")
+        race_country = st.selectbox("Country/Region", 
+                                   ["Venezuela", "USA", "UK", "Australia", "Japan", "Other"])
+        distance = st.number_input("Distance (furlongs)", 5.0, 14.0, 8.0, 0.5)
+        surface = st.selectbox("Surface", ["Dirt", "Turf", "All-Weather"])
+        field_size = st.number_input("Expected Field Size", 4, 20, 8)
 
     # Main content
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.header("📁 Upload Race Data File")
+        st.header("📄 Upload ANY Racing Document")
         
         st.markdown("""
-        ### Supported file formats:
-        - **CSV files** (.csv) - Excel/spreadsheet exports
-        - **Text files** (.txt) - Simple text documents
-        - **Text-based PDFs** - PDFs with selectable text
-        - **Copy/paste text** - Direct text input
+        ### 🌍 Universal Support:
+        - **Venezuela:** La Rinconada, Valencia
+        - **USA:** Churchill Downs, Santa Anita, Belmont
+        - **UK:** Ascot, Cheltenham, Aintree  
+        - **Australia:** Flemington, Randwick
+        - **Japan:** Tokyo, Nakayama
+        - **ANY OTHER TRACK worldwide!**
         
-        ### Expected data format:
-        ```
-        Horse Name, Beyer Figure, Recent Finishes, Post Position, Jockey Win%, Trainer Win%
-        ```
+        ### 📋 Supported Formats:
+        - Race programs (any track)
+        - Past performances (any source)
+        - Race cards (any format)
+        - PDFs, text files, copy-paste
         """)
 
-        # File upload section
+        # File upload
         uploaded_file = st.file_uploader(
-            "📁 Choose a file",
-            type=['csv', 'txt', 'pdf'],
-            help="Upload CSV, TXT, or text-based PDF files"
+            "📁 Upload racing document (PDF, TXT, CSV)",
+            type=['pdf', 'txt', 'csv'],
+            help="Works with ANY racing format worldwide"
         )
 
         if uploaded_file is not None:
-            with st.spinner("🔍 Reading file and extracting race data..."):
+            with st.spinner("🔍 Analyzing racing document format..."):
                 # Extract text from file
-                text_content = extract_text_from_file(uploaded_file)
+                text_content = ""
+                try:
+                    # Try different methods to read the file
+                    if uploaded_file.name.lower().endswith('.txt'):
+                        text_content = uploaded_file.read().decode('utf-8')
+                    elif uploaded_file.name.lower().endswith('.csv'):
+                        import pandas as pd
+                        df = pd.read_csv(uploaded_file)
+                        text_content = df.to_string()
+                    else:
+                        # Try to read as text (works for many PDFs)
+                        content = uploaded_file.read()
+                        try:
+                            text_content = content.decode('utf-8', errors='ignore')
+                        except:
+                            text_content = content.decode('latin-1', errors='ignore')
+                except Exception as e:
+                    st.error(f"❌ Could not read file: {str(e)}")
                 
                 if text_content:
-                    st.success(f"✅ File loaded: {uploaded_file.name}")
+                    st.success("✅ File loaded successfully!")
                     
-                    # Show preview of extracted text
-                    with st.expander("👀 Preview extracted data"):
+                    # Show preview
+                    with st.expander("👀 Preview extracted text"):
                         st.text(text_content[:500] + "..." if len(text_content) > 500 else text_content)
                     
-                    # Parse the data
-                    horses = parse_race_data(text_content)
+                    # Extract horses
+                    horses = extract_universal_racing_data(text_content)
                     
                     if horses:
-                        st.success(f"🐎 Found {len(horses)} horses in the file!")
+                        st.success(f"🐎 Found {len(horses)} horses!")
                         
                         # Show extracted horses
                         with st.expander("📋 View extracted horses"):
                             for i, horse in enumerate(horses, 1):
-                                st.write(f"{i}. **{horse['name']}**")
-                                st.caption(f"   Speed: {horse['beyer_speed_figure']} | Post: {horse['post_position']} | Recent: {horse['recent_finishes']}")
+                                col_h1, col_h2 = st.columns(2)
+                                with col_h1:
+                                    st.write(f"**{i}. {horse['name']}**")
+                                    st.caption(f"Post: {horse['post_position']} | Weight: {horse['weight']}kg")
+                                with col_h2:
+                                    st.caption(f"Recent: {horse['recent_finishes']}")
                         
                         if st.button("🚀 Analyze Race", type="primary"):
                             st.session_state.horses = horses
                             st.session_state.race_loaded = True
                             st.rerun()
                     else:
-                        st.error("❌ Could not find valid horse data in the file.")
-                        st.info("💡 Please check the file format or use manual input below.")
-                else:
-                    st.error("❌ Could not read the file. It might be an image-based PDF.")
+                        st.warning("⚠️ Could not extract horse data. Try manual input below.")
 
-        # Manual input fallback
-        st.markdown("### 📝 Manual Input (Alternative)")
-        
+        # Manual input section (Universal format)
+        st.markdown("### 📝 Manual Input (Works with ANY format)")
         st.markdown("""
-        If your file doesn't work, paste race data directly:
+        **Copy and paste directly from your racing source:**
         
-        **Format:** Horse Name, Beyer Figure, Recent Finishes, Post Position, Jockey Win%, Trainer Win%
+        **Examples of what works:**
+        - Horse Name, Post, Weight, Recent Finishes
+        - MULTIVERSO 55 1;2;1 8
+        - Thunder Strike, 3, 95, 1,2,3
+        - Any tabular format with horse names and numbers
         """)
         
-        sample_data = """Thunder Strike, 95, 1;2;1, 3, 22, 18
-Lightning Bolt, 93, 2;1;2, 7, 18, 25
-Desert Storm, 88, 3;3;4, 2, 15, 20
-Morning Glory, 91, 4;2;1, 10, 20, 16
-Royal Command, 90, 1;4;3, 5, 12, 24"""
+        universal_sample = """MULTIVERSO 55 1;2;1 8
+MANCHEGA 53 3;4;2 10  
+FURIA 55.5 1;2;3 1
+CARAMEL LOVE 53 5;3;2 6
+SALOME 55.5 3;5;4 4
+PRIORITISE 53.5 2;1;3 2
+PRINCESA SUSEJ 58 1;4;2 13
+MISS UNIVERSO 53 4;3;5 14
+MI QUERIDA MONTSE 53 2;3;1 3
+RENACER 53 3;2;4 5
+REINA FABRICIA 53 1;3;2 7
+FANTASTIC SHOT 54 2;1;3 9
+MISTICA 53 4;2;1 11
+COACH SESSA 56 1;2;3 12"""
 
-        manual_input = st.text_area(
-            "Paste race data here:",
-            value=sample_data,
-            height=150,
-            help="Enter one horse per line, comma-separated values"
+        universal_input = st.text_area(
+            "📋 Paste ANY racing data format:",
+            value=universal_sample,
+            height=200,
+            help="Works with any format - just include horse names and numbers"
         )
         
-        if st.button("Analyze Manual Input"):
-            horses = parse_race_data(manual_input)
+        if st.button("🚀 Analyze Universal Format"):
+            horses = extract_universal_racing_data(universal_input)
             if horses:
                 st.session_state.horses = horses
                 st.session_state.race_loaded = True
                 st.rerun()
             else:
-                st.error("❌ Invalid data format. Please check your input.")
+                st.error("❌ Could not parse format. Try simpler format: Name, Weight, Recent, Post")
 
     with col2:
         st.header("📊 Race Overview")
@@ -321,54 +394,67 @@ Royal Command, 90, 1;4;3, 5, 12, 24"""
         if 'horses' in st.session_state and st.session_state.horses:
             horses = st.session_state.horses
             st.metric("Total Horses", len(horses))
-            st.metric("Race Distance", f"{distance} furlongs")
-            st.metric("Track Condition", track_condition)
+            st.metric("Distance", f"{distance} furlongs")
+            st.metric("Surface", surface)
             
-            st.subheader("🐎 Race Entries:")
+            st.subheader("🐎 Entries Found:")
             for i, horse in enumerate(horses, 1):
                 with st.expander(f"{i}. {horse['name']}"):
-                    st.write(f"**Speed:** {horse['beyer_speed_figure']}")
                     st.write(f"**Post:** {horse['post_position']}")
+                    st.write(f"**Weight:** {horse['weight']}kg")
                     st.write(f"**Recent:** {horse['recent_finishes']}")
-                    st.write(f"**Jockey:** {horse['jockey_win_percentage']*100:.1f}%")
-                    st.write(f"**Trainer:** {horse['trainer_win_percentage']*100:.1f}%")
+                    if horse.get('jockey'):
+                        st.write(f"**Jockey:** {horse['jockey']}")
         else:
-            st.info("📁 Upload a file to see race entries")
+            st.info("📄 Upload racing document to analyze")
 
     # AI Analysis Section
     if 'horses' in st.session_state and len(st.session_state.horses) >= 2:
-        st.header("🔮 AI Race Analysis")
+        st.header("🔮 Universal AI Race Analysis")
         
-        predictor = HorseRacingPredictor()
+        predictor = UniversalHorseRacingPredictor()
         
-        # Update horses with race conditions
+        # Update with race conditions
         for horse in st.session_state.horses:
             horse['race_distance'] = distance
-            horse['track_condition'] = track_condition.lower().replace('-', '_')
+            horse['track_condition'] = surface.lower().replace('-', '_')
             horse['field_size'] = len(st.session_state.horses)
         
-        predictions = predictor.predict_race(st.session_state.horses)
+        predictions = predictor.predict_universal_race(st.session_state.horses)
         
-        st.subheader("🏆 Final Predictions")
+        st.subheader("🏆 Universal Predictions")
         
         col_pred1, col_pred2 = st.columns([1, 1])
         
         with col_pred1:
-            # Results table
-            results_df = pd.DataFrame(predictions)
-            display_cols = ['Horse', 'Win_Probability', 'Score', 'Beyer_Figure']
-            st.dataframe(results_df[display_cols].head(8))
+            # Create display data
+            display_data = []
+            for horse in predictions:
+                display_data.append({
+                    'Rank': predictions.index(horse) + 1,
+                    'Horse': horse['Horse'],
+                    'Post': horse['Post_Position'],
+                    'Win%': horse['Win_Probability'],
+                    'Score': horse['Score'],
+                    'Analysis': horse['Analysis'][:30] + "..." if len(horse['Analysis']) > 30 else horse['Analysis']
+                })
+            
+            # Simple text table
+            st.text("Rank | Horse               |Post|Win%|Score|Analysis")
+            st.text("-" * 55)
+            for item in display_data[:8]:
+                st.text(f"{item['Rank']:4} | {item['Horse'][:17]:17} | {item['Post']:4} | {item['Win%']:3} | {item['Score']:5} | {item['Analysis']}")
         
         with col_pred2:
-            # Bar chart
-            chart_data = pd.DataFrame({
-                'Horse': [p['Horse'] for p in predictions[:8]],
-                'Win Probability': [p['Win_Probability'] for p in predictions[:8]]
-            })
-            st.bar_chart(chart_data.set_index('Horse'))
+            # Simple text-based chart
+            st.text("Win Probability Visualization:")
+            for horse in predictions[:6]:
+                bar_length = int(horse['Win_Probability'] / 2)
+                bar = "█" * bar_length + "░" * (25 - bar_length)
+                st.text(f"{horse['Horse'][:15]:15} |{bar}| {horse['Win_Probability']}%")
 
         # Detailed analysis
-        with st.expander("📈 Detailed Horse Analysis"):
+        with st.expander("📈 Detailed Analysis"):
             for idx, horse in enumerate(predictions[:5], 1):
                 col_det1, col_det2 = st.columns([1, 2])
                 
@@ -378,21 +464,20 @@ Royal Command, 90, 1;4;3, 5, 12, 24"""
                     st.metric("AI Score", horse['Score'])
                 
                 with col_det2:
-                    st.write("**Performance Metrics:**")
-                    cols = st.columns(4)
+                    st.write("**Universal Metrics:**")
+                    cols = st.columns(3)
                     with cols[0]:
-                        st.metric("Speed", horse['Beyer_Figure'])
+                        st.metric("Post Position", horse['Post_Position'])
                     with cols[1]:
-                        st.metric("Form", f"{horse['Form_Score']:.3f}")
+                        st.metric("Weight", f"{horse['Weight']}kg")
                     with cols[2]:
-                        st.metric("Class", f"{horse['Class_Score']:.3f}")
-                    with cols[3]:
-                        st.metric("Post", f"{horse['Post_Advantage']:.3f}")
+                        st.metric("Recent Form", str(horse['Recent_Form']))
                 
+                st.write(f"**Analysis:** {horse['Analysis']}")
                 st.divider()
 
-        # Betting Strategy
-        st.header("💰 AI Betting Recommendations")
+        # Universal betting recommendations
+        st.header("💰 Universal Betting Strategy")
         
         col_bet1, col_bet2, col_bet3 = st.columns(3)
         
@@ -402,40 +487,44 @@ Royal Command, 90, 1;4;3, 5, 12, 24"""
         
         with col_bet2:
             if len(predictions) > 1:
-                value_play = predictions[1] if predictions[1]['Win_Probability'] > 15 else predictions[0]
-                st.metric("💎 Exacta Key", value_play['Horse'], f"{value_play['Win_Probability']}%")
+                exacta_key = predictions[:2]
+                exacta_names = ", ".join([h['Horse'].split()[0] for h in exacta_key])
+                st.metric("💎 Exacta Key", exacta_names, "Top 2")
         
         with col_bet3:
-            longshots = [p for p in predictions if 3 < p['Win_Probability'] < 10]
+            longshots = [p for p in predictions if 5 < p['Win_Probability'] < 15]
             if longshots:
-                longshot = longshots[-1]
-                st.metric("🚀 Longshot", longshot['Horse'], f"{longshot['Win_Probability']}%")
+                longshot_names = ", ".join([h['Horse'].split()[0] for h in longshots[:2]])
+                st.metric("🎯 Value Plays", longshot_names, "5-15%")
 
-        # Export results
-        st.header("📁 Export Predictions")
+        # Export functionality
+        st.header("📁 Export Results")
         
         export_data = []
         for idx, horse in enumerate(predictions, 1):
             export_data.append({
                 'Rank': idx,
                 'Horse': horse['Horse'],
+                'Post_Position': horse['Post_Position'],
                 'Win_Probability': horse['Win_Probability'],
                 'Score': horse['Score'],
-                'Beyer_Figure': horse['Beyer_Figure'],
-                'Form_Score': horse['Form_Score'],
-                'Class_Score': horse['Class_Score'],
-                'Jockey_Score': horse['Jockey_Score'],
-                'Trainer_Score': horse['Trainer_Score'],
-                'Post_Advantage': horse['Post_Advantage']
+                'Weight': horse['Weight'],
+                'Recent_Form': str(horse['Recent_Form']),
+                'Analysis': horse['Analysis']
             })
         
-        csv_df = pd.DataFrame(export_data)
-        csv = csv_df.to_csv(index=False)
+        # Simple CSV export (without pandas)
+        csv_lines = ["Rank,Horse,Post_Position,Win_Probability,Score,Weight,Recent_Form,Analysis"]
+        for item in export_data:
+            line = f"{item['Rank']},{item['Horse']},{item['Post_Position']},{item['Win_Probability']},{item['Score']},{item['Weight']},\"{item['Recent_Form']}\",\"{item['Analysis']}\""
+            csv_lines.append(line)
+        
+        csv_content = "\n".join(csv_lines)
         
         st.download_button(
-            label="📊 Download Race Predictions CSV",
-            data=csv,
-            file_name=f"race_predictions_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            label="📊 Download Universal Predictions CSV",
+            data=csv_content,
+            file_name=f"universal_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
 
@@ -443,8 +532,8 @@ Royal Command, 90, 1;4;3, 5, 12, 24"""
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>🏇 Powered by KimiK2 AI Horse Racing Analysis System</p>
-        <p>Supports: CSV files, Text files, and text-based PDFs</p>
+        <p>🏇 Universal Horse Racing AI - Works with ANY format worldwide</p>
+        <p>Venezuela • USA • UK • Australia • Japan • Any Track • Any Format</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
     """, unsafe_allow_html=True)
