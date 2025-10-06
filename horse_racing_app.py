@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-import PyPDF2
 import re
 from datetime import datetime
+from io import StringIO
 
 st.set_page_config(
     page_title="🐎 KimiK2 Horse Racing Predictor",
@@ -130,106 +130,90 @@ class HorseRacingPredictor:
                 result['Win_Probability'] = (result['Win_Probability'] / total_prob * 100).round(1)
         return results
 
-def extract_race_data_from_pdf(pdf_file):
-    """Extract race data from PDF file"""
-    horses = []
+def extract_text_from_file(uploaded_file):
+    """Extract text from uploaded file (CSV, TXT, or basic PDF text)"""
+    text = ""
     
-    try:
-        # Read PDF
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+    # Get file extension
+    filename = uploaded_file.name.lower()
+    
+    if filename.endswith('.csv'):
+        # Read CSV file
+        df = pd.read_csv(uploaded_file)
+        # Convert to text format
+        text_lines = []
+        for _, row in df.iterrows():
+            line = ",".join([str(val) for val in row.values])
+            text_lines.append(line)
+        text = "\n".join(text_lines)
         
-        # Common patterns for horse racing data
-        patterns = [
-            # Pattern 1: Horse, Beyer, Finishes, Post, Jockey%, Trainer%
-            r'([A-Za-z\s\']+)\s*,?\s*(\d+)\s*,?\s*([\d;]+)\s*,?\s*(\d+)\s*,?\s*(\d+(?:\.\d+)?)\s*,?\s*(\d+(?:\.\d+)?)',
-            # Pattern 2: Simpler format - Horse, Speed, Post, Jockey
-            r'([A-Za-z\s\']+)\s+(\d+)\s+([\d;]+)\s+(\d+)\s+(\d+(?:\.\d+)?)',
-            # Pattern 3: Tabular format
-            r'(\d+)\s+([A-Za-z\s\']+)\s+(\d+)\s+([\d;]+)\s+(\d+(?:\.\d+)?)'
-        ]
+    elif filename.endswith('.txt'):
+        # Read text file
+        string_io = StringIO(uploaded_file.getvalue().decode("utf-8"))
+        text = string_io.read()
         
-        for pattern in patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    if len(match) >= 5:
-                        # Determine which pattern matched
-                        if match[0].isdigit():  # Pattern 3 (starts with number)
-                            horse_data = {
-                                'name': match[1].strip(),
-                                'beyer_speed_figure': int(match[2]),
-                                'recent_finishes': [int(x.strip()) for x in match[3].split(';')],
-                                'post_position': int(match[0]),
-                                'jockey_win_percentage': float(match[4]) / 100,
-                                'trainer_win_percentage': float(match[4]) / 100,
-                                'race_class': 'allowance',
-                                'horse_class': 'allowance',
-                                'field_size': 8,
-                                'race_distance': 8.0,
-                                'track_condition': 'fast'
-                            }
-                        else:  # Pattern 1 or 2
-                            horse_data = {
-                                'name': match[0].strip(),
-                                'beyer_speed_figure': int(match[1]),
-                                'recent_finishes': [int(x.strip()) for x in match[2].split(';')],
-                                'post_position': int(match[3]),
-                                'jockey_win_percentage': float(match[4]) / 100,
-                                'trainer_win_percentage': float(match[5]) / 100 if len(match) > 5 else float(match[4]) / 100,
-                                'race_class': 'allowance',
-                                'horse_class': 'allowance',
-                                'field_size': 8,
-                                'race_distance': 8.0,
-                                'track_condition': 'fast'
-                            }
-                        horses.append(horse_data)
-                except:
+    else:
+        # Try to read as text (for simple PDFs or other formats)
+        try:
+            string_io = StringIO(uploaded_file.getvalue().decode("utf-8"))
+            text = string_io.read()
+        except:
+            text = ""
+    
+    return text
+
+def parse_race_data(text_data):
+    """Parse race data from text format"""
+    horses = []
+    lines = text_data.strip().split('\n')
+    
+    for line in lines:
+        if not line.strip():
+            continue
+            
+        # Try different separators (comma, tab, space)
+        parts = line.split(',')
+        if len(parts) < 4:
+            parts = line.split('\t')
+        if len(parts) < 4:
+            parts = line.split()
+            if len(parts) >= 5:
+                # Space-separated: combine first elements as horse name
+                name_parts = []
+                i = 0
+                while i < len(parts) and not parts[i].isdigit():
+                    name_parts.append(parts[i])
+                    i += 1
+                if i + 3 < len(parts):
+                    parts = [' '.join(name_parts), parts[i], parts[i+1], parts[i+2], parts[i+3]]
+                else:
                     continue
         
-        # If no pattern matches, try simple line-by-line parsing
-        if not horses:
-            lines = text.split('\n')
-            for line in lines:
-                # Try to find any line with numbers and horse names
-                numbers = re.findall(r'\d+', line)
-                words = re.findall(r'[A-Za-z]+', line)
-                
-                if len(numbers) >= 3 and len(words) >= 1:
-                    try:
-                        horse_data = {
-                            'name': ' '.join(words[:2]),  # First 1-2 words as name
-                            'beyer_speed_figure': int(numbers[0]),
-                            'recent_finishes': [int(numbers[1])],
-                            'post_position': int(numbers[2]),
-                            'jockey_win_percentage': 0.12,
-                            'trainer_win_percentage': 0.15,
-                            'race_class': 'allowance',
-                            'horse_class': 'allowance',
-                            'field_size': len(lines),
-                            'race_distance': 8.0,
-                            'track_condition': 'fast'
-                        }
-                        horses.append(horse_data)
-                    except:
-                        continue
-    
-    except Exception as e:
-        st.error(f"Error reading PDF: {str(e)}")
+        if len(parts) >= 5:
+            try:
+                horse_data = {
+                    'name': parts[0].strip(),
+                    'beyer_speed_figure': int(parts[1].strip()),
+                    'recent_finishes': [int(x.strip()) for x in parts[2].split(';')],
+                    'post_position': int(parts[3].strip()),
+                    'jockey_win_percentage': float(parts[4].strip()) / 100,
+                    'trainer_win_percentage': float(parts[5].strip()) / 100 if len(parts) > 5 else float(parts[4].strip()) / 100,
+                    'race_class': 'allowance',
+                    'horse_class': 'allowance',
+                    'field_size': len(lines),
+                    'race_distance': 8.0,
+                    'track_condition': 'fast'
+                }
+                horses.append(horse_data)
+            except Exception as e:
+                st.warning(f"Could not parse line: {line[:50]}... Error: {str(e)}")
+                continue
     
     return horses
 
 def main():
-    st.set_page_config(
-        page_title="🐎 KimiK2 Horse Racing Predictor",
-        page_icon="🐎",
-        layout="wide"
-    )
-
     st.title("🏇 KimiK2 Horse Racing Predictor")
-    st.subheader("📄 Upload Race PDF for AI Analysis")
+    st.subheader("📁 Upload Race Data File (CSV, TXT, or Text-based PDF)")
 
     # Race setup
     with st.sidebar:
@@ -244,98 +228,92 @@ def main():
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.header("📄 Upload Race PDF")
+        st.header("📁 Upload Race Data File")
         
         st.markdown("""
-        ### Upload your race program or past performances PDF:
+        ### Supported file formats:
+        - **CSV files** (.csv) - Excel/spreadsheet exports
+        - **Text files** (.txt) - Simple text documents
+        - **Text-based PDFs** - PDFs with selectable text
+        - **Copy/paste text** - Direct text input
         
-        **Supported formats:**
-        - Race programs (Equibase, Daily Racing Form, etc.)
-        - Past performance PDFs
-        - Race cards from tracks
-        
-        **The PDF should contain:**
-        - Horse names
-        - Beyer Speed Figures
-        - Recent finishing positions
-        - Post positions
-        - Jockey/trainer statistics
+        ### Expected data format:
+        ```
+        Horse Name, Beyer Figure, Recent Finishes, Post Position, Jockey Win%, Trainer Win%
+        ```
         """)
 
-        # File upload
+        # File upload section
         uploaded_file = st.file_uploader(
-            "📁 Choose a PDF file",
-            type=['pdf'],
-            help="Upload a race program or past performances PDF"
+            "📁 Choose a file",
+            type=['csv', 'txt', 'pdf'],
+            help="Upload CSV, TXT, or text-based PDF files"
         )
 
         if uploaded_file is not None:
-            with st.spinner("🔍 Extracting race data from PDF..."):
-                horses = extract_race_data_from_pdf(uploaded_file)
+            with st.spinner("🔍 Reading file and extracting race data..."):
+                # Extract text from file
+                text_content = extract_text_from_file(uploaded_file)
                 
-                if horses:
-                    st.success(f"✅ Found {len(horses)} horses in the PDF!")
+                if text_content:
+                    st.success(f"✅ File loaded: {uploaded_file.name}")
                     
-                    # Show extracted data
-                    with st.expander("📋 View Extracted Data"):
-                        for i, horse in enumerate(horses, 1):
-                            st.write(f"{i}. **{horse['name']}**")
-                            st.caption(f"   Speed: {horse['beyer_speed_figure']} | Post: {horse['post_position']} | Recent: {horse['recent_finishes']}")
+                    # Show preview of extracted text
+                    with st.expander("👀 Preview extracted data"):
+                        st.text(text_content[:500] + "..." if len(text_content) > 500 else text_content)
                     
-                    if st.button("🚀 Analyze Race", type="primary"):
-                        st.session_state.horses = horses
-                        st.session_state.race_loaded = True
-                        st.rerun()
-                else:
-                    st.warning("⚠️ Could not extract horse data from PDF. Please check the format.")
+                    # Parse the data
+                    horses = parse_race_data(text_content)
                     
-                    # Manual input fallback
-                    st.markdown("### 📝 Manual Input Fallback")
-                    st.markdown("Since the PDF couldn't be parsed automatically, you can copy-paste the data:")
-                    
-                    manual_input = st.text_area(
-                        "Paste race data here (Horse Name, Beyer, Recent Finishes, Post, Jockey%, Trainer%):",
-                        height=150,
-                        help="Format: Horse Name, 95, 1;2;1, 3, 22, 18"
-                    )
-                    
-                    if st.button("Analyze Manually Entered Data"):
-                        horses = parse_manual_data(manual_input)
-                        if horses:
+                    if horses:
+                        st.success(f"🐎 Found {len(horses)} horses in the file!")
+                        
+                        # Show extracted horses
+                        with st.expander("📋 View extracted horses"):
+                            for i, horse in enumerate(horses, 1):
+                                st.write(f"{i}. **{horse['name']}**")
+                                st.caption(f"   Speed: {horse['beyer_speed_figure']} | Post: {horse['post_position']} | Recent: {horse['recent_finishes']}")
+                        
+                        if st.button("🚀 Analyze Race", type="primary"):
                             st.session_state.horses = horses
                             st.session_state.race_loaded = True
                             st.rerun()
+                    else:
+                        st.error("❌ Could not find valid horse data in the file.")
+                        st.info("💡 Please check the file format or use manual input below.")
+                else:
+                    st.error("❌ Could not read the file. It might be an image-based PDF.")
 
-        # Sample data section
-        with st.expander("📝 Don't have a PDF? Use sample data"):
-            st.markdown("""
-            ### Sample Race Data Format:
-            ```
-            Thunder Strike, 95, 1;2;1, 3, 22, 18
-            Lightning Bolt, 93, 2;1;2, 7, 18, 25
-            Desert Storm, 88, 3;3;4, 2, 15, 20
-            Morning Glory, 91, 4;2;1, 10, 20, 16
-            Royal Command, 90, 1;4;3, 5, 12, 24
-            ```
-            """)
-            
-            sample_data = """Thunder Strike, 95, 1;2;1, 3, 22, 18
+        # Manual input fallback
+        st.markdown("### 📝 Manual Input (Alternative)")
+        
+        st.markdown("""
+        If your file doesn't work, paste race data directly:
+        
+        **Format:** Horse Name, Beyer Figure, Recent Finishes, Post Position, Jockey Win%, Trainer Win%
+        """)
+        
+        sample_data = """Thunder Strike, 95, 1;2;1, 3, 22, 18
 Lightning Bolt, 93, 2;1;2, 7, 18, 25
 Desert Storm, 88, 3;3;4, 2, 15, 20
 Morning Glory, 91, 4;2;1, 10, 20, 16
-Royal Command, 90, 1;4;3, 5, 12, 24
-Speed Demon, 89, 2;1;2, 1, 25, 14
-Golden Arrow, 87, 5;3;2, 8, 16, 19
-Silver Streak, 86, 3;5;4, 12, 14, 17"""
-            
-            manual_input = st.text_area("Or paste data here:", value=sample_data, height=150)
-            
-            if st.button("Analyze Sample Data"):
-                horses = parse_manual_data(manual_input)
-                if horses:
-                    st.session_state.horses = horses
-                    st.session_state.race_loaded = True
-                    st.rerun()
+Royal Command, 90, 1;4;3, 5, 12, 24"""
+
+        manual_input = st.text_area(
+            "Paste race data here:",
+            value=sample_data,
+            height=150,
+            help="Enter one horse per line, comma-separated values"
+        )
+        
+        if st.button("Analyze Manual Input"):
+            horses = parse_race_data(manual_input)
+            if horses:
+                st.session_state.horses = horses
+                st.session_state.race_loaded = True
+                st.rerun()
+            else:
+                st.error("❌ Invalid data format. Please check your input.")
 
     with col2:
         st.header("📊 Race Overview")
@@ -355,7 +333,7 @@ Silver Streak, 86, 3;5;4, 12, 14, 17"""
                     st.write(f"**Jockey:** {horse['jockey_win_percentage']*100:.1f}%")
                     st.write(f"**Trainer:** {horse['trainer_win_percentage']*100:.1f}%")
         else:
-            st.info("📄 Upload a PDF to see race entries")
+            st.info("📁 Upload a file to see race entries")
 
     # AI Analysis Section
     if 'horses' in st.session_state and len(st.session_state.horses) >= 2:
@@ -466,41 +444,10 @@ Silver Streak, 86, 3;5;4, 12, 14, 17"""
     st.markdown("""
     <div style='text-align: center; color: #666;'>
         <p>🏇 Powered by KimiK2 AI Horse Racing Analysis System</p>
-        <p>Supports: Race programs, past performances, and PDF race cards</p>
+        <p>Supports: CSV files, Text files, and text-based PDFs</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
     """, unsafe_allow_html=True)
-
-def parse_manual_data(text_data):
-    """Parse manually entered race data"""
-    horses = []
-    lines = text_data.strip().split('\n')
-    
-    for line in lines:
-        if not line.strip():
-            continue
-            
-        parts = line.split(',')
-        if len(parts) >= 5:
-            try:
-                horse_data = {
-                    'name': parts[0].strip(),
-                    'beyer_speed_figure': int(parts[1].strip()),
-                    'recent_finishes': [int(x.strip()) for x in parts[2].split(';')],
-                    'post_position': int(parts[3].strip()),
-                    'jockey_win_percentage': float(parts[4].strip()) / 100,
-                    'trainer_win_percentage': float(parts[5].strip()) / 100 if len(parts) > 5 else float(parts[4].strip()) / 100,
-                    'race_class': 'allowance',
-                    'horse_class': 'allowance',
-                    'field_size': len(lines),
-                    'race_distance': 8.0,
-                    'track_condition': 'fast'
-                }
-                horses.append(horse_data)
-            except:
-                continue
-    
-    return horses
 
 if __name__ == "__main__":
     main()
