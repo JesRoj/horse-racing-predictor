@@ -90,22 +90,23 @@ def clean_and_extract_names(text):
 
 def extract_racing_data_enhanced(text):
     """Enhanced racing data extraction with better name handling"""
-    # Clean the text first
     clean_text = clean_and_extract_names(text)
     horses = []
     lines = clean_text.strip().split('\n')
-    
-    # Look for horse names more intelligently
+
     for i, line in enumerate(lines):
         line = line.strip()
         if not line or len(line) < 5:
             continue
-            
-        # Enhanced pattern recognition for encoded text
+
         words = line.split()
+        if len(words) < 8:          # ← prevents IndexError
+            continue
+
         horse_name = ""
-        numbers = []
+        numbers    = []
         post_position = None
+        ...
         
         # More sophisticated name detection for encoded text
         for j, word in enumerate(words):
@@ -335,3 +336,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
