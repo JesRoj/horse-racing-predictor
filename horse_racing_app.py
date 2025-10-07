@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 class RacingPredictorFixed:
-     def __init__(self):
+    def __init__(self):
         self.weights = {
             'speed_figure': 0.30, 'recent_form': 0.25, 'class_level': 0.15,
             'post_position': 0.10, 'jockey_skill': 0.10, 'trainer_stats': 0.08,
@@ -324,5 +324,6 @@ def main():
         file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
+
 
 
