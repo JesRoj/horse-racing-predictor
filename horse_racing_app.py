@@ -24,6 +24,7 @@ class EnhancedRacingPredictorPDF:
         }
 
     def calculate_score(self, horse_data):
+        """Universal scoring without complex calculations"""
         speed_base = horse_data.get('speed_rating', 75)
         recent_form = horse_data.get('recent_finishes', [5, 5, 5])
         form_score = 0.5
@@ -36,6 +37,7 @@ class EnhancedRacingPredictorPDF:
         return speed_base * 0.5 + form_score * 40 + post_score * 10
 
     def predict_race(self, horses_data):
+        """Universal race prediction with proper error handling"""
         results = []
         for horse in horses_data:
             score = self.calculate_score(horse)
@@ -73,7 +75,7 @@ def clean_and_extract_names(text):
         'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U',
         'â': 'a', 'ê': 'e', 'î': 'i', 'ô': 'o', 'û': 'u',
         'Â': 'A', 'Ê': 'E', 'Î': 'I', 'Ô': 'O', 'Û': 'U',
-        'à': 'a', 'è': 'e', 'ì': 'i', 'ò': 'o', 'ù': 'u',
+        'à': 'e', 'è': 'e', 'ì': 'i', 'ò': 'o', 'ù': 'u',
         'À': 'A', 'È': 'E', 'Ì': 'I', 'Ò': 'O', 'Ù': 'U',
         'ç': 'c', 'Ç': 'C', 'ñ': 'n', 'Ñ': 'N',
         'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', 'ü': 'u',
@@ -209,7 +211,7 @@ def main():
                         st.success("✅ File read successfully!")
                         
                         # Show preview
-                        with st.expander("👀 Preview extracted text")
+                        with st.expander("👀 Preview extracted text"):
                             preview = text_content[:300] + "..." if len(text_content) > 300 else text_content
                             st.text(preview)
                         
@@ -323,7 +325,7 @@ def main():
         <p>Character encoding fixes • Better name extraction • Enhanced PDF processing</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
-    "", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
