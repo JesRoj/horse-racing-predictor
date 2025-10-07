@@ -1,24 +1,14 @@
 import streamlit as st
 from datetime import datetime
+import re
 
 st.set_page_config(
-    page_title="🐎 PDF-Only Racing Predictor", 
+    page_title="🐎 Enhanced PDF Racing Predictor", 
     page_icon="🐎",
     layout="wide"
 )
 
-# Remove manual input completely - PDF only
-st.markdown("""
-<style>
-/* Hide manual input sections */
-div[data-testid="stTextArea"], 
-div[data-testid="stButton"] button[kind="primary"]:contains("Analyze Manual Input") {
-    display: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-class RacingPredictorPDFOnly:
+class EnhancedRacingPredictorPDF:
     def __init__(self):
         self.weights = {
             'speed_figure': 0.30, 'recent_form': 0.25, 'class_level': 0.15,
@@ -55,7 +45,7 @@ class RacingPredictorPDFOnly:
                 'Win_Probability': round(max(0, score - 70), 1),
                 'Post_Position': horse.get('post_position', '?'),
                 'Weight': horse.get('weight', '?'),
-                'Recent_Form': horse.get('recent_finishes', '?'),
+                'Recent_Form': horse.get('recent_form', '?'),
                 'Analysis': "📊 Racing analysis"
             })
         
@@ -71,35 +61,54 @@ class RacingPredictorPDFOnly:
         
         return results
 
-def extract_racing_data_pdf_only(text):
-    """PDF-only racing data extraction - no manual fallback"""
+def clean_and_extract_names(text):
+    """Enhanced name extraction that handles encoded characters"""
+    # Remove common PDF artifacts
+    clean_text = text.replace('obj', '').replace('PDF', '').replace('endobj', '')
+    
+    # Replace encoded characters with proper equivalents
+    replacements = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+        'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U',
+        'â': 'a', 'ê': 'e', 'î': 'i', 'ô': 'o', 'û': 'u',
+        'Â': 'A', 'Ê': 'E', 'Î': 'I', 'Ô': 'O', 'Û': 'U',
+        'à': 'a', 'è': 'e', 'ì': 'i', 'ò': 'o', 'ù': 'u',
+        'À': 'A', 'È': 'E', 'Ì': 'I', 'Ò': 'O', 'Ù': 'U',
+        'ç': 'c', 'Ç': 'C', 'ñ': 'n', 'Ñ': 'N',
+        'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', 'ü': 'u',
+        'Ä': 'A', 'Ë': 'E', 'Ï': 'I', 'Ö': 'O', 'Ü': 'U'
+    }
+    
+    for encoded, normal in replacements.items():
+        clean_text = clean_text.replace(encoded, normal)
+    
+    return clean_text
+
+def extract_racing_data_enhanced(text):
+    """Enhanced racing data extraction with better name handling"""
+    # Clean the text first
+    clean_text = clean_and_extract_names(text)
     horses = []
-    lines = text.strip().split('\n')
+    lines = clean_text.strip().split('\n')
     
-    # Quality check first
-    if not lines or len(lines) < 3:
-        return []  # Empty if no meaningful content
-    
-    # Clean and process
-    clean_text = text.encode('ascii', 'ignore').decode('ascii')
-    clean_text = clean_text.replace('obj', '').replace('PDF', '')
-    clean_text = clean_text.replace('³', '3').replace('²', '2').replace('¹', '1')
-    clean_text = clean_text.replace('½', '0.5').replace('¼', '0.25').replace('¾', '0.75')
-    
-    # Simple extraction
+    # Look for horse names more intelligently
     for i, line in enumerate(lines):
         line = line.strip()
         if not line or len(line) < 5:
             continue
             
+        # Enhanced pattern recognition
         words = line.split()
         horse_name = ""
         numbers = []
+        post_position = None
         
-        for word in words:
+        # More sophisticated name detection
+        for j, word in enumerate(words):
             word = word.strip('.,;[](){}')
             
-            # Try as number
+            # Try as number first
             try:
                 if '.' in word:
                     num = float(word)
@@ -109,34 +118,50 @@ def extract_racing_data_pdf_only(text):
                     num = int(word)
                     numbers.append(num)
             except ValueError:
-                # It's text - use as name if reasonable
-                if (word.isalpha() and 
-                    len(word) >= 3 and 
-                    len(word) <= 20 and
+                # It's text - check if it's a reasonable horse name
+                if (len(word) >= 3 and 
+                    len(word) <= 25 and 
+                    word.isalpha() and 
                     not horse_name and
-                    word.lower() not in ['pdf', 'obj', 'endobj']):
-                    horse_name = word
+                    word.lower() not in ['pdf', 'obj', 'endobj', 'the', 'and', 'or']):
+                    
+                    # Check if it looks like a horse name (capitals, reasonable length)
+                    if word[0].isupper() or len(word) > 4:
+                        horse_name = word
+            
+            # If we found a horse name, look for post position
+            if horse_name and len(numbers) > 0:
+                post_position = len(horses) + 1  # Sequential for now
         
+        # Create horse if we found something reasonable
         if horse_name and len(numbers) >= 1:
-            horse_data = {
-                'name': horse_name,
-                'post_position': len(horses) + 1,
-                'weight': numbers[0] if 10 <= numbers[0] <= 70 else 55,
-                'recent_finishes': numbers[1:4] if len(numbers) > 1 else [5, 5, 5],
-                'jockey_win_percentage': 0.12,
-                'trainer_win_percentage': 0.15,
-                'field_size': len([l for l in lines if len(l.strip()) > 5]),
-                'race_distance': 8.0,
-                'track_condition': 'fast',
-                'speed_rating': 75
-            }
-            horses.append(horse_data)
+            # Better recent form detection
+            recent_form = []
+            for num in numbers[1:6]:  # Look for more numbers
+                if 1 <= num <= 20:
+                    recent_form.append(num)
+            
+            # Only create if we have meaningful data
+            if len(horse_name) > 2 and len(horse_name) < 25:
+                horse_data = {
+                    'name': horse_name,
+                    'post_position': post_position if post_position else len(horses) + 1,
+                    'weight': numbers[0] if 10 <= numbers[0] <= 70 else 55,
+                    'recent_finishes': recent_form[:5] if len(recent_form) > 0 else [5, 5, 5],
+                    'jockey_win_percentage': 0.12,
+                    'trainer_win_percentage': 0.15,
+                    'field_size': len([l for l in lines if len(l.strip()) > 5]),
+                    'race_distance': 8.0,
+                    'track_condition': 'fast',
+                    'speed_rating': 75
+                }
+                horses.append(horse_data)
     
     return horses[:20]  # Max 20 horses
 
 def main():
-    st.title("🏇 PDF-Only Racing Predictor")
-    st.subheader("📄 Racing Document Analysis Only")
+    st.title("🐎 Enhanced PDF Racing Predictor")
+    st.subheader("📄 Enhanced Character & Encoding Handling")
 
     # Race setup
     with st.sidebar:
@@ -145,30 +170,30 @@ def main():
         distance = st.number_input("Distance (furlongs)", 5.0, 14.0, 8.0, 0.5)
         surface = st.selectbox("Surface", ["Dirt", "Turf", "All-Weather"])
 
-    # Main content - PDF Only
+    # Main content - Enhanced PDF Only
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.header("📄 Upload Racing Document Only")
+        st.header("📄 Upload Racing Document - Enhanced")
         
         st.markdown("""
-        ### 📄 PDF-Only Processing:
-        - **Racing programs** (PDF format)
-        - **Text files** (.txt, .csv)
-        - **Racing cards** (any format)
-        - **No manual input** - file upload only
-        - **Automatic processing** - upload and analyze
+        ### 🔧 Enhanced Character Handling:
+        - **Character encoding fixes** (á, é, ñ, ü, etc.)
+        - **Better name recognition** from encoded text
+        - **Improved text cleaning** from PDF artifacts
+        - **Enhanced pattern recognition** for racing formats
+        - **Professional PDF-only processing**
         """)
 
-        # File upload - PDF only
+        # File upload - Enhanced PDF Only
         uploaded_file = st.file_uploader(
-            "📁 Upload racing document (PDF, TXT, CSV only)",
+            "📁 Upload racing document (PDF, TXT, CSV)",
             type=['pdf', 'txt', 'csv'],
-            help="Upload racing documents only - no manual input"
+            help="Enhanced character handling for better name extraction"
         )
 
         if uploaded_file is not None:
-            with st.spinner("🔍 Processing racing document..."):
+            with st.spinner("🔍 Enhanced character processing..."):
                 text_content = ""
                 try:
                     # Read with multiple encoding attempts
@@ -184,12 +209,12 @@ def main():
                         st.success("✅ File read successfully!")
                         
                         # Show preview
-                        with st.expander("👀 Preview extracted text"):
+                        with st.expander("👀 Preview extracted text")
                             preview = text_content[:300] + "..." if len(text_content) > 300 else text_content
                             st.text(preview)
                         
-                        # Extract racing data
-                        horses = extract_racing_data_pdf_only(text_content)
+                        # Extract with enhanced method
+                        horses = extract_racing_data_enhanced(text_content)
                         
                         if horses:
                             st.success(f"🐎 Found {len(horses)} horses!")
@@ -208,7 +233,7 @@ def main():
                                 st.session_state.horses = horses
                                 st.rerun()
                         else:
-                            st.warning("⚠️ Could not extract horse data from this file format.")
+                            st.warning("⚠️ Could not extract horse data from this format.")
                             st.info("💡 Try converting your PDF using Google Drive or online OCR tools first.")
                     else:
                         st.error("❌ Could not read file content.")
@@ -232,13 +257,13 @@ def main():
                     st.write(f"**Weight:** {horse['weight']}kg")
                     st.write(f"**Recent:** {horse['recent_finishes']}")
         else:
-            st.info("📄 Upload a racing document to analyze")
+            st.info("📄 Upload racing document to analyze")
 
     # AI Analysis Section
     if 'horses' in st.session_state and len(st.session_state.horses) >= 2:
-        st.header("🔮 AI Race Analysis")
+        st.header("🔮 Enhanced AI Race Analysis")
         
-        predictor = RacingPredictorPDFOnly()
+        predictor = EnhancedRacingPredictorPDF()
         
         # Update with race conditions
         for horse in st.session_state.horses:
@@ -286,19 +311,19 @@ def main():
         st.download_button(
             label="📊 Download Predictions CSV",
             data=csv_content,
-            file_name=f"race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"enhanced_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
 
-    # Footer - PDF Only
+    # Footer - Enhanced PDF Only
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>🏇 PDF-Only Racing AI - File Upload Only</p>
-        <p>No manual input • File upload only • Automatic processing</p>
+        <p>🏇 Enhanced PDF Racing AI - Better Character Recognition</p>
+        <p>Character encoding fixes • Better name extraction • Enhanced PDF processing</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
-    """, unsafe_allow_html=True)
+    "", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
