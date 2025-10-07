@@ -290,7 +290,7 @@ def main():
             for i, horse in enumerate(predictions[:8], 1):
                 st.text(f"{i:4} | {horse['Horse'][:17]:17} | {horse['Post_Position']:4} | {horse['Win_Probability']:3} | {horse['Score']:5}")
         
-        with col_pred2:
+                with col_pred2:
             # Simple text chart
             st.text("Win Probability:")
             for horse in predictions[:6]:
@@ -298,7 +298,7 @@ def main():
                 bar = "█" * bar_length + "░" * (25 - bar_length)
                 st.text(f"{horse['Horse'][:15]:15} |{bar}| {horse['Win_Probability']}%")
 
-        # Fixed CSV Export
+    # Fixed CSV Export
     st.header("📁 Export Predictions")
 
     # Create proper CSV content
