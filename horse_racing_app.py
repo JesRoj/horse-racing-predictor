@@ -304,13 +304,17 @@ def main():
         # Create proper CSV content
         csv_lines = ["Rank,Horse,Post_Position,Win_Probability,Score,Weight,Recent_Form,Analysis"]
         
-        for i, horse in enumerate(predictions, 1):
-            # Clean the data for CSV
-            horse_name = horse['Horse'].replace(',', ' ').replace('"', '').strip()
-            recent_form = str(horse['Recent_Form']).replace(',', ' ')
-            
-            csv_line = f"{i},{horse_name},{horse['Post_Position']},{horse['Win_Probability']},{horse['Score']},{horse['Weight']},\"{recent_form}\",\"{horse['Analysis']}\""
-            csv_lines.append(csv_line)
+       for i, horse in enumerate(predictions, 1):
+    horse_name   = str(horse.get('Horse',        f'Horse{i}')).replace(',', ' ').replace('"', '').strip()
+    post_pos     = horse.get('Post_Position', i)
+    win_prob     = horse.get('Win_Probability', 0)
+    score        = horse.get('Score',           0)
+    weight       = horse.get('Weight',         55)
+    recent_form  = str(horse.get('Recent_Form', '')).replace(',', ' ')
+    analysis     = str(horse.get('Analysis',    'No analysis')).replace(',', ' ')
+
+    csv_line = f'{i},{horse_name},{post_pos},{win_prob},{score},{weight},"{recent_form}","{analysis}"'
+    csv_lines.append(csv_line)
         
         csv_content = "\n".join(csv_lines)
         
@@ -336,4 +340,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
