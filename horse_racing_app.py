@@ -298,10 +298,10 @@ def main():
                 bar = "█" * bar_length + "░" * (25 - bar_length)
                 st.text(f"{horse['Horse'][:15]:15} |{bar}| {horse['Win_Probability']}%")
 
-              # Fixed CSV Export
-        st.header("📁 Export Predictions")
+        # Fixed CSV Export
+    st.header("📁 Export Predictions")
 
-          # Create proper CSV content
+    # Create proper CSV content
     csv_lines = ["Rank,Horse,Post_Position,Win_Probability,Score,Weight,Recent_Form,Analysis"]
 
     for i, horse in enumerate(predictions, 1):
