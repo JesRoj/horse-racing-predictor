@@ -1,14 +1,24 @@
 import streamlit as st
 from datetime import datetime
-import io
 
 st.set_page_config(
-    page_title="🐎 Universal Horse Racing Predictor", 
+    page_title="🐎 PDF-Only Racing Predictor", 
     page_icon="🐎",
     layout="wide"
 )
 
-class UniversalHorseRacingPredictor:
+# Remove manual input completely - PDF only
+st.markdown("""
+<style>
+/* Hide manual input sections */
+div[data-testid="stTextArea"], 
+div[data-testid="stButton"] button[kind="primary"]:contains("Analyze Manual Input") {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+class RacingPredictorPDFOnly:
     def __init__(self):
         self.weights = {
             'speed_figure': 0.30, 'recent_form': 0.25, 'class_level': 0.15,
@@ -23,8 +33,7 @@ class UniversalHorseRacingPredictor:
             16: 0.72, 17: 0.69, 18: 0.66, 19: 0.63, 20: 0.60
         }
 
-    def calculate_universal_score(self, horse_data):
-        """Universal scoring without complex calculations"""
+    def calculate_score(self, horse_data):
         speed_base = horse_data.get('speed_rating', 75)
         recent_form = horse_data.get('recent_finishes', [5, 5, 5])
         form_score = 0.5
@@ -36,11 +45,10 @@ class UniversalHorseRacingPredictor:
         post_score = self.post_weights.get(post, 0.90)
         return speed_base * 0.5 + form_score * 40 + post_score * 10
 
-    def predict_universal_race(self, horses_data):
-        """Universal race prediction with proper error handling"""
+    def predict_race(self, horses_data):
         results = []
         for horse in horses_data:
-            score = self.calculate_universal_score(horse)
+            score = self.calculate_score(horse)
             results.append({
                 'Horse': horse.get('name', 'Unknown'),
                 'Score': round(score, 2),
@@ -48,7 +56,7 @@ class UniversalHorseRacingPredictor:
                 'Post_Position': horse.get('post_position', '?'),
                 'Weight': horse.get('weight', '?'),
                 'Recent_Form': horse.get('recent_finishes', '?'),
-                'Analysis': "📊 Standard analysis"
+                'Analysis': "📊 Racing analysis"
             })
         
         results.sort(key=lambda x: x['Score'], reverse=True)
@@ -63,62 +71,27 @@ class UniversalHorseRacingPredictor:
         
         return results
 
-def detect_pdf_quality(text):
-    """Detect if PDF text extraction worked properly"""
-    # Check for common PDF extraction problems
-    problems = []
-    
-    # Check for PDF object references
-    if 'obj' in text.lower() and text.count('obj') > 5:
-        problems.append("PDF object references detected")
-    
-    # Check for excessive special characters
-    special_chars = set(c for c in text if not c.isalnum() and not c.isspace())
-    if len(special_chars) > 20:
-        problems.append("Excessive special characters")
-    
-    # Check for meaningful content
-    words = text.split()
-    meaningful_words = [w for w in words if len(w) > 2 and w.isalpha()]
-    if len(meaningful_words) < 10:
-        problems.append("Insufficient meaningful text")
-    
-    # Check for horse racing terms
-    racing_terms = ['horse', 'race', 'jockey', 'trainer', 'post', 'weight', 'finish']
-    has_racing_terms = any(term in text.lower() for term in racing_terms)
-    
-    return {
-        'is_good': len(problems) == 0 and has_racing_terms,
-        'problems': problems,
-        'meaningful_words': len(meaningful_words),
-        'has_racing_terms': has_racing_terms
-    }
-
-def extract_racing_data_robust(text):
-    """Robust racing data extraction that handles any format"""
+def extract_racing_data_pdf_only(text):
+    """PDF-only racing data extraction - no manual fallback"""
     horses = []
     lines = text.strip().split('\n')
     
-    # First, check if this is good text
-    quality_check = detect_pdf_quality(text)
+    # Quality check first
+    if not lines or len(lines) < 3:
+        return []  # Empty if no meaningful content
     
-    if not quality_check['is_good']:
-        print(f"PDF quality issues detected: {quality_check['problems']}")
-        return []  # Return empty so manual input is used
-    
-    # Clean the text
+    # Clean and process
     clean_text = text.encode('ascii', 'ignore').decode('ascii')
     clean_text = clean_text.replace('obj', '').replace('PDF', '')
     clean_text = clean_text.replace('³', '3').replace('²', '2').replace('¹', '1')
     clean_text = clean_text.replace('½', '0.5').replace('¼', '0.25').replace('¾', '0.75')
     
-    # Look for basic patterns
+    # Simple extraction
     for i, line in enumerate(lines):
         line = line.strip()
         if not line or len(line) < 5:
             continue
             
-        # Simple pattern: find words and numbers
         words = line.split()
         horse_name = ""
         numbers = []
@@ -144,7 +117,6 @@ def extract_racing_data_robust(text):
                     word.lower() not in ['pdf', 'obj', 'endobj']):
                     horse_name = word
         
-        # Create horse if we found something reasonable
         if horse_name and len(numbers) >= 1:
             horse_data = {
                 'name': horse_name,
@@ -160,11 +132,11 @@ def extract_racing_data_robust(text):
             }
             horses.append(horse_data)
     
-    return horses[:20]
+    return horses[:20]  # Max 20 horses
 
 def main():
-    st.title("🏇 Universal Horse Racing Predictor")
-    st.subheader("📄 Robust PDF & Text Parser")
+    st.title("🏇 PDF-Only Racing Predictor")
+    st.subheader("📄 Racing Document Analysis Only")
 
     # Race setup
     with st.sidebar:
@@ -173,30 +145,30 @@ def main():
         distance = st.number_input("Distance (furlongs)", 5.0, 14.0, 8.0, 0.5)
         surface = st.selectbox("Surface", ["Dirt", "Turf", "All-Weather"])
 
-    # Main content
+    # Main content - PDF Only
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.header("📄 Upload Racing Document")
+        st.header("📄 Upload Racing Document Only")
         
         st.markdown("""
-        ### 🔧 Robust PDF Handling:
-        - **Detects PDF quality issues**
-        - **Handles image-based PDFs**
-        - **Filters out PDF object references**
-        - **Multiple extraction strategies**
-        - **Always provides results**
+        ### 📄 PDF-Only Processing:
+        - **Racing programs** (PDF format)
+        - **Text files** (.txt, .csv)
+        - **Racing cards** (any format)
+        - **No manual input** - file upload only
+        - **Automatic processing** - upload and analyze
         """)
 
-        # File upload
+        # File upload - PDF only
         uploaded_file = st.file_uploader(
-            "📁 Choose racing file (PDF, TXT, CSV)",
+            "📁 Upload racing document (PDF, TXT, CSV only)",
             type=['pdf', 'txt', 'csv'],
-            help="Robust parsing - handles any PDF format"
+            help="Upload racing documents only - no manual input"
         )
 
         if uploaded_file is not None:
-            with st.spinner("🔍 Robust parsing with quality check..."):
+            with st.spinner("🔍 Processing racing document..."):
                 text_content = ""
                 try:
                     # Read with multiple encoding attempts
@@ -209,89 +181,40 @@ def main():
                             continue
                     
                     if text_content:
-                        # Check PDF quality
-                        quality_check = detect_pdf_quality(text_content)
+                        st.success("✅ File read successfully!")
                         
-                        if quality_check['is_good']:
-                            st.success(f"✅ Good quality PDF detected! Found {quality_check['meaningful_words']} meaningful words.")
+                        # Show preview
+                        with st.expander("👀 Preview extracted text"):
+                            preview = text_content[:300] + "..." if len(text_content) > 300 else text_content
+                            st.text(preview)
+                        
+                        # Extract racing data
+                        horses = extract_racing_data_pdf_only(text_content)
+                        
+                        if horses:
+                            st.success(f"🐎 Found {len(horses)} horses!")
                             
-                            # Show preview
-                            with st.expander("👀 Preview text"):
-                                preview = text_content[:300] + "..." if len(text_content) > 300 else text_content
-                                st.text(preview)
+                            # Show extracted horses
+                            with st.expander("📋 View extracted horses"):
+                                for i, horse in enumerate(horses, 1):
+                                    col_h1, col_h2 = st.columns([1, 1])
+                                    with col_h1:
+                                        st.write(f"**{i}. {horse['name']}**")
+                                        st.caption(f"Post: {horse['post_position']} | Weight: {horse['weight']}kg")
+                                    with col_h2:
+                                        st.caption(f"Recent: {horse['recent_finishes']}")
                             
-                            # Extract with robust method
-                            horses = extract_racing_data_robust(text_content)
-                            
-                            if horses:
-                                st.success(f"🐎 Found {len(horses)} horses!")
-                                
-                                # Show extracted horses
-                                with st.expander("📋 View extracted horses"):
-                                    for i, horse in enumerate(horses, 1):
-                                        col_h1, col_h2 = st.columns([1, 1])
-                                        with col_h1:
-                                            st.write(f"**{i}. {horse['name']}**")
-                                            st.caption(f"Post: {horse['post_position']} | Weight: {horse['weight']}kg")
-                                        with col_h2:
-                                            st.caption(f"Recent: {horse['recent_finishes']}")
-                                
-                                if st.button("🚀 Analyze Race", type="primary"):
-                                    st.session_state.horses = horses
-                                    st.rerun()
-                            else:
-                                st.warning("⚠️ Could not extract horse data automatically.")
+                            if st.button("🚀 Analyze Race", type="primary"):
+                                st.session_state.horses = horses
+                                st.rerun()
                         else:
-                            st.warning(f"⚠️ PDF quality issues: {', '.join(quality_check['problems'])}")
-                            st.info("💡 The PDF appears to be image-based or corrupted. Please use manual input below.")
+                            st.warning("⚠️ Could not extract horse data from this file format.")
+                            st.info("💡 Try converting your PDF using Google Drive or online OCR tools first.")
                     else:
                         st.error("❌ Could not read file content.")
                         
                 except Exception as e:
                     st.error(f"❌ File error: {str(e)}")
-
-        # Manual input - Always works
-        st.markdown("### 📝 Manual Input - Always Works")
-        st.markdown("""
-        **This ALWAYS works - copy ANY racing data:**
-        
-        **Examples:**
-        - MULTIVERSO 8 55 1;2;1
-        - HorseName Post Weight
-        - Just names and post positions
-        - Any format with horse names
-        """)
-
-        universal_sample = """MULTIVERSO 8 55 1;2;1
-MANCHEGA 10 53 3;4;2  
-FURIA 1 55.5 1;2;3
-CARAMEL LOVE 6 53 5;3;2
-SALOME 4 55.5 3;5;4
-PRIORITISE 2 53.5 2;1;3
-PRINCESA SUSEJ 13 58 1;4;2
-MISS UNIVERSO 14 53 4;3;5
-MI QUERIDA MONTSE 3 53 2;3;1
-RENACER 5 53 3;2;4
-REINA FABRICIA 7 53 1;3;2
-FANTASTIC SHOT 9 54 2;1;3
-MISTICA 11 53 4;2;1
-COACH SESSA 12 56 1;2;3"""
-
-        manual_input = st.text_area(
-            "📋 Paste ANY racing data (always works):",
-            value=universal_sample,
-            height=200,
-            help="ANY format will work - guaranteed!"
-        )
-        
-        if st.button("🚀 Analyze Manual Input", type="primary"):
-            horses = extract_racing_data_ultra_simple(manual_input)
-            if horses:
-                st.session_state.horses = horses
-                st.success(f"✅ Loaded {len(horses)} horses!")
-                st.rerun()
-            else:
-                st.error("❌ Could not parse. Try: HorseName PostPosition Weight")
 
     with col2:
         st.header("📊 Race Overview")
@@ -309,13 +232,13 @@ COACH SESSA 12 56 1;2;3"""
                     st.write(f"**Weight:** {horse['weight']}kg")
                     st.write(f"**Recent:** {horse['recent_finishes']}")
         else:
-            st.info("📄 Upload racing document or use manual input")
+            st.info("📄 Upload a racing document to analyze")
 
     # AI Analysis Section
     if 'horses' in st.session_state and len(st.session_state.horses) >= 2:
         st.header("🔮 AI Race Analysis")
         
-        predictor = UniversalHorseRacingPredictor()
+        predictor = RacingPredictorPDFOnly()
         
         # Update with race conditions
         for horse in st.session_state.horses:
@@ -323,7 +246,7 @@ COACH SESSA 12 56 1;2;3"""
             horse['track_condition'] = surface.lower().replace('-', '_')
             horse['field_size'] = len(st.session_state.horses)
         
-        predictions = predictor.predict_universal_race(st.session_state.horses)
+        predictions = predictor.predict_race(st.session_state.horses)
         
         st.subheader("🏆 Final Predictions")
         
@@ -367,12 +290,12 @@ COACH SESSA 12 56 1;2;3"""
             mime="text/csv"
         )
 
-    # Footer
+    # Footer - PDF Only
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>🏇 Robust Racing AI - Handles Any PDF Quality</p>
-        <p>PDF quality detection • Image PDF handling • Always provides results</p>
+        <p>🏇 PDF-Only Racing AI - File Upload Only</p>
+        <p>No manual input • File upload only • Automatic processing</p>
         <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
     </div>
     """, unsafe_allow_html=True)
