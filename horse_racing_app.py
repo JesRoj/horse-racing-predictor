@@ -290,7 +290,7 @@ def main():
             for i, horse in enumerate(predictions[:8], 1):
                 st.text(f"{i:4} | {horse['Horse'][:17]:17} | {horse['Post_Position']:4} | {horse['Win_Probability']:3} | {horse['Score']:5}")
         
-                with col_pred2:
+                   with col_pred2:
             # Simple text chart
             st.text("Win Probability:")
             for horse in predictions[:6]:
@@ -324,3 +324,4 @@ def main():
         file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
+
