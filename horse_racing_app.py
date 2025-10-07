@@ -322,17 +322,16 @@ def main():
 
     # Footer - Fixed PDF Only
     st.markdown("---")
-   st.markdown("""
-    Your **markdown** text goes here.
-    More lines…
-""")
-    <div style='text-align: center; color: #666;'>
-        <p>🏇 Fixed PDF Racing AI - Better Character Recognition</p>
-        <p>Character encoding fixes • Better name extraction • Fixed file refresh</p>
-        <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
-    </div>
-    "", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div style='text-align: center; color: #666;'>
+            <p>🏇 Fixed PDF Racing AI - Better Character Recognition</p>
+            <p>Character encoding fixes • Better name extraction • Fixed file refresh</p>
+            <p><strong>Remember:</strong> This is for entertainment purposes. Always gamble responsibly.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     main()
-
