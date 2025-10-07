@@ -301,26 +301,26 @@ def main():
               # Fixed CSV Export
         st.header("📁 Export Predictions")
 
-        # Create proper CSV content
-        csv_lines = ["Rank,Horse,Post_Position,Win_Probability,Score,Weight,Recent_Form,Analysis"]
+          # Create proper CSV content
+    csv_lines = ["Rank,Horse,Post_Position,Win_Probability,Score,Weight,Recent_Form,Analysis"]
 
-        for i, horse in enumerate(predictions, 1):
-            horse_name   = str(horse.get('Horse',        f'Horse{i}')).replace(',', ' ').replace('"', '').strip()
-            post_pos     = horse.get('Post_Position', i)
-            win_prob     = horse.get('Win_Probability', 0)
-            score        = horse.get('Score',           0)
-            weight       = horse.get('Weight',         55)
-            recent_form  = str(horse.get('Recent_Form', '')).replace(',', ' ')
-            analysis     = str(horse.get('Analysis',    'No analysis')).replace(',', ' ')
+    for i, horse in enumerate(predictions, 1):
+        horse_name   = str(horse.get('Horse',        f'Horse{i}')).replace(',', ' ').replace('"', '').strip()
+        post_pos     = horse.get('Post_Position', i)
+        win_prob     = horse.get('Win_Probability', 0)
+        score        = horse.get('Score',           0)
+        weight       = horse.get('Weight',         55)
+        recent_form  = str(horse.get('Recent_Form', '')).replace(',', ' ')
+        analysis     = str(horse.get('Analysis',    'No analysis')).replace(',', ' ')
 
-            csv_line = f'{i},{horse_name},{post_pos},{win_prob},{score},{weight},"{recent_form}","{analysis}"'
-            csv_lines.append(csv_line)
+        csv_line = f'{i},{horse_name},{post_pos},{win_prob},{score},{weight},"{recent_form}","{analysis}"'
+        csv_lines.append(csv_line)
 
-        csv_content = "\n".join(csv_lines)
+    csv_content = "\n".join(csv_lines)
 
-        st.download_button(
-            label="📊 Download Predictions CSV",
-            data=csv_content,
-            file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+    st.download_button(
+        label="📊 Download Predictions CSV",
+        data=csv_content,
+        file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
