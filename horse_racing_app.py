@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 class RacingPredictorFixed:
-    def __init__(self):
+     def __init__(self):
         self.weights = {
             'speed_figure': 0.30, 'recent_form': 0.25, 'class_level': 0.15,
             'post_position': 0.10, 'jockey_skill': 0.10, 'trainer_stats': 0.08,
@@ -281,16 +281,16 @@ def main():
         
         st.subheader("🏆 Final Predictions")
         
-        col_pred1, col_pred2 = st.columns([1, 1])
+    col_pred1, col_pred2 = st.columns([1, 1])
         
-        with col_pred1:
+    with col_pred1:
             # Simple text table
             st.text("Rank | Horse               |Post|Win%|Score")
             st.text("-" * 45)
             for i, horse in enumerate(predictions[:8], 1):
                 st.text(f"{i:4} | {horse['Horse'][:17]:17} | {horse['Post_Position']:4} | {horse['Win_Probability']:3} | {horse['Score']:5}")
         
-                   with col_pred2:
+    with col_pred2:
             # Simple text chart
             st.text("Win Probability:")
             for horse in predictions[:6]:
@@ -324,4 +324,5 @@ def main():
         file_name=f"fixed_race_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
+
 
