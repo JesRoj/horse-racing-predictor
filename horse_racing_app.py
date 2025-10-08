@@ -81,22 +81,19 @@ if uploaded_file is not None:
     horses.sort(key=lambda x: x["post"])
 
     if st.button("🔮 Predict race", type="primary", key="predict"):
-            # --- real mini-analysis ---
-            for h in horses:
-                finishes = []                       # grab any nearby numbers as finishes
-                for tok in text.replace(",", " ").split():
-                    try:
-                        n = int(tok)
-                        if 1 <= n <= 20:
-                            finishes.append(n)
-                    except ValueError:
+            # --- real form from same line only ---
+            for line in text.splitlines():
+                for h in horses:
+                    if h["name"] not in line:
                         continue
-                avg_finish = sum(finishes[:3]) / 3 if finishes else 5.0   # last 3 runs
-                h["avg_finish"] = avg_finish
-                h["win%"] = round(max(0, 100 - avg_finish * 5), 1)        # simple curve
+                    # pick up every 1-20 number on that line
+                    finishes = [int(n) for n in re.findall(r'\b([1-9]|[1-1]\d|20)\b', line)]
+                    h["avg_finish"] = sum(finishes[:3]) / 3 if finishes else 5.0
+                    h["win%"] = round(max(0, 100 - h["avg_finish"] * 5), 1)
+                    break          # done for this horse
 
             horses.sort(key=lambda x: x["win%"], reverse=True)
-            # ----------------------------
+            # ------------------------------------
             st.markdown("### 🏆 Real-form prediction")
             for i, h in enumerate(horses, 1):
                 bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
@@ -113,6 +110,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
