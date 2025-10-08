@@ -22,13 +22,17 @@ if uploaded_file is not None:
     st.success(f"Extracted {len(text)} chars from {len(reader.pages)} page(s)")
 
     # ultra-simple horse grab: lines that start with “H” + digit(s) + “a”
+        # grab post-position + horse name from any line that has
+    #   number(s)  name-with-spaces  more-numbers
     horses = []
     for line in text.splitlines():
-        m = re.match(r'^\s*H\d+a\s+(\d+)\s+([A-Z][A-Z0-9 ]+)\b', line, re.I)
+        # look for:  (1-2 digits)  (capitalised name)  (decimal or integer)
+        m = re.search(r'(?:^|\s)(\d{1,2})\s+([A-Z][A-Z0-9 ]+?)\s+\d+(?:\.\d+)?', line)
         if m:
             post, name = m.groups()
-            horses.append({"post": int(post), "name": name.strip()})
-
+            name = name.strip()
+            if len(name) > 3 and name not in {"PRINCESA"}:   # avoid duplicates
+                horses.append({"post": int(post), "name": name})
     if horses:
         st.subheader(f"🐎 Found {len(horses)} horses")
         for h in horses:
@@ -37,3 +41,4 @@ if uploaded_file is not None:
         st.warning("No horse lines matched – showing raw first 1000 chars")
         with st.expander("Raw text"):
             st.text(text[:1000])
+
