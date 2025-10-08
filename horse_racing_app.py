@@ -30,19 +30,15 @@ if uploaded_file is not None:
     horses = []
     for line in text.splitlines():
         m = re.search(
-            r'(?:^|\s)(\d{1,2})\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?)\s+(?=\d+\.?\d*)',
+            r'(?:^|\s)(\d{1,2})\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?)(?=\s+[A-Z][a-z]+ [A-Z][a-z]+|\s+\d)',
             line,
             re.I,
         )
         if m:
             post, name = m.groups()
-            post = int(post)
-            name = name.strip()
-            # basic sanity filters
+            post, name = int(post), name.strip()
+            st.text(f"RAW-MATCH → post:{post}  name:<<{name}>>")   # ← debug
             if 1 <= post <= 20 and len(name) >= 4 and name.lower() not in seen:
-                # skip obvious jockey names (all-lowercase surname pattern)
-                if re.fullmatch(r'[A-Z][a-z]+ [A-Z][a-z]+', name):
-                    continue
                 seen.add(name.lower())
                 horses.append({"post": post, "name": name})
     if horses:
@@ -72,6 +68,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
