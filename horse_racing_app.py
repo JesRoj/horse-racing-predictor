@@ -46,9 +46,9 @@ if uploaded_file is not None:
                 # rule 1: single short word → jockey/trainer garbage
                 if len(words) == 1 and len(name) <= 8:
                     continue
-                # rule 2: two short capitalised words → jockey
+                # rule 2: two short capitalised words → jockey  (both ≤ 6)
                 if (len(words) == 2 and
-                    len(words[0]) <= 9 and len(words[1]) <= 9 and
+                    len(words[0]) <= 6 and len(words[1]) <= 6 and
                     words[0][0].isupper() and words[1][0].isupper()):
                     continue
                 # rule 3: last word lowercase → surname
@@ -82,6 +82,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
