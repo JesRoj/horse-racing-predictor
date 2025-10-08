@@ -33,7 +33,7 @@ if uploaded_file is not None:
             name = name.strip()
             if len(name) > 3 and name not in {"PRINCESA"}:   # avoid duplicates
                 horses.append({"post": int(post), "name": name})
-            if horses:
+    if horses:
         st.subheader(f"🐎 Found {len(horses)} horses")
         for h in horses:
             st.write(f"Post {h['post']:2} – {h['name']}")
@@ -52,3 +52,4 @@ if uploaded_file is not None:
         st.warning("No horse lines matched – showing raw first 1000 chars")
         with st.expander("Raw text"):
             st.text(text[:1000])
+
