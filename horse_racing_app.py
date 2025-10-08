@@ -19,5 +19,5 @@ if uploaded_file is not None:
         st.error("No readable text found in PDF – try an OCR’d or text-based PDF.")
     else:
         st.success(f"Extracted {len(text)} chars from {len(reader.pages)} page(s)")
-        with st.expander("👀 Text preview"):
-            st.text(text[:1000])
+        with st.expander("👀 Clean text preview"):
+            st.text(text[:1500])       # show first 1500 clean chars
