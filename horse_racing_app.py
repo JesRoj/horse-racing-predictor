@@ -1,5 +1,6 @@
 import streamlit as st
-
+from datetime import datetime   # ← keep or add this line
+import re
 st.set_page_config(page_title="🐎 Racing Predictor", page_icon="🐎")
 st.title("🐎 Racing Predictor – Step 1")
 st.write("Upload a racing document (PDF, TXT, CSV).")
@@ -60,3 +61,4 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
