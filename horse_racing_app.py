@@ -7,20 +7,17 @@ st.write("Upload a racing document (PDF, TXT, CSV).")
 uploaded_file = st.file_uploader("📁 Choose file", type=["pdf", "txt", "csv"])
 
 if uploaded_file is not None:
-    raw = uploaded_file.read()
+    from pypdf import PdfReader
+    import io
 
-    # try a few encodings
-    text = None
-    for enc in ("utf-8", "latin-1", "cp1252"):
-        try:
-            text = raw.decode(enc)
-            break
-        except UnicodeDecodeError:
-            continue
+    reader = PdfReader(io.BytesIO(uploaded_file.read()))
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
 
-    if text is None:
-        st.error("Could not decode file – try a plain-text or CSV version.")
+    if not text.strip():
+        st.error("No readable text found in PDF – try an OCR’d or text-based PDF.")
     else:
-        st.success(f"Loaded {uploaded_file.name} – {len(text)} chars")
-        with st.expander("👀 Text preview (first 500 chars)"):
-            st.text(text[:500])
+        st.success(f"Extracted {len(text)} chars from {len(reader.pages)} page(s)")
+        with st.expander("👀 Text preview"):
+            st.text(text[:1000])
