@@ -41,22 +41,23 @@ if uploaded_file is not None:
 
             # 1-20 only, no duplicates
             if 1 <= post <= 20 and name.lower() not in seen:
-                # ---- NEW FILTERS ----
-                # 1) drop obvious single-word first names
-                first_names = {
-                    "ramón", "carlos", "josé", "david", "freddy", "robert", "yorbis",
-                    "wladimir", "rohendy", "jose", "ramon", "carlos", "fredy",
-                }
-                if " " not in name and name.lower() in first_names:
+                # ---- stricter automatic filters ----
+                words = name.split()
+                # rule 1: single short word → jockey/trainer garbage
+                if len(words) == 1 and len(name) <= 8:
                     continue
-                # 2) drop if tail is lowercase (jockey pattern)
-                if re.search(r'\s+[a-z]{3,}$', name):
+                # rule 2: two short capitalised words → jockey
+                if (len(words) == 2 and
+                    len(words[0]) <= 9 and len(words[1]) <= 9 and
+                    words[0][0].isupper() and words[1][0].isupper()):
                     continue
-                # ---------------------
+                # rule 3: last word lowercase → surname
+                if words and words[-1].islower():
+                    continue
+                # ------------------------------------
 
                 seen.add(name.lower())
                 horses.append({"post": post, "name": name})
-
     horses.sort(key=lambda x: x["post"])
 
     if st.button("🔮 Predict race", type="primary"):
@@ -81,6 +82,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
