@@ -48,3 +48,15 @@ if uploaded_file is not None:
             for i, h in enumerate(horses, 1):
                 bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
                 st.write(f"{i}. **{h['name']}**  `{h['win%']}%`  \n{bar}")
+            # ---- CSV export ----
+            csv_lines = ["Rank,Horse,Post,Win%"]
+            for i, h in enumerate(horses, 1):
+                csv_lines.append(f"{i},{h['name']},{h['post']},{h['win%']}")
+            csv_str = "\n".join(csv_lines)
+
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_str,
+                file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
