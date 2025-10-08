@@ -38,11 +38,26 @@ if uploaded_file is not None:
             post, name = m.groups()
             post = int(post)
             name = name.strip()
-            # 1-20 only, no duplicates, no all-lowercase tail (jockey)
+
+            # 1-20 only, no duplicates
             if 1 <= post <= 20 and name.lower() not in seen:
-                if not re.search(r'[a-z]{3,}$', name):   # drop jockey names
-                    seen.add(name.lower())
-                    horses.append({"post": post, "name": name})
+                # ---- NEW FILTERS ----
+                # 1) drop obvious single-word first names
+                first_names = {
+                    "ramón", "carlos", "josé", "david", "freddy", "robert", "yorbis",
+                    "wladimir", "rohendy", "jose", "ramon", "carlos", "fredy",
+                }
+                if " " not in name and name.lower() in first_names:
+                    continue
+                # 2) drop if tail is lowercase (jockey pattern)
+                if re.search(r'\s+[a-z]{3,}$', name):
+                    continue
+                # ---------------------
+
+                seen.add(name.lower())
+                horses.append({"post": post, "name": name})
+
+    horses.sort(key=lambda x: x["post"])
 
     if st.button("🔮 Predict race", type="primary"):
             import random
@@ -66,6 +81,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
