@@ -30,10 +30,10 @@ if uploaded_file is not None:
     horses = []
     for line in text.splitlines():
         m = re.search(
-            r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?)(?=\s+[A-Z][a-z]+|\s+\d)',
-            line,
-            re.I,
-        )
+                    r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?)(?=\s+[a-z])',
+                    line,
+                    re.I,
+                )
         if m:
             post, name = m.groups()
             post = int(post)
@@ -98,6 +98,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
