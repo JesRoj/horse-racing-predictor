@@ -38,14 +38,13 @@ if uploaded_file is not None:
         for h in horses:
             st.write(f"Post {h['post']:2} – {h['name']}")
 
-        if st.button("🔮 Predict race", type="primary"):
+    if st.button("🔮 Predict race", type="primary"):
             import random
             for h in horses:
                 h["win%"] = round(random.uniform(5, 30), 1)
-
             horses.sort(key=lambda x: x["win%"], reverse=True)
 
-                        st.markdown("### 🏆 Quick prediction")
+            st.markdown("### 🏆 Quick prediction")
             for i, h in enumerate(horses, 1):
                 bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
                 st.write(f"{i}. **{h['name']}**  `{h['win%']}%`  \n{bar}")
