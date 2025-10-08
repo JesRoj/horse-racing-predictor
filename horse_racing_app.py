@@ -45,11 +45,7 @@ if uploaded_file is not None:
 
             horses.sort(key=lambda x: x["win%"], reverse=True)
 
-            st.markdown("### 🏆 Quick prediction")
+                        st.markdown("### 🏆 Quick prediction")
             for i, h in enumerate(horses, 1):
-                st.write(f"{i}. {h['name']}  –  {h['win%']}% win chance")
-    else:
-        st.warning("No horse lines matched – showing raw first 1000 chars")
-        with st.expander("Raw text"):
-            st.text(text[:1000])
-
+                bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
+                st.write(f"{i}. **{h['name']}**  `{h['win%']}%`  \n{bar}")
