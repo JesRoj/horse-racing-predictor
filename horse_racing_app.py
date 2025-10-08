@@ -25,14 +25,19 @@ if uploaded_file is not None:
     # ultra-simple horse grab: lines that start with “H” + digit(s) + “a”
         # grab post-position + horse name from any line that has
     #   number(s)  name-with-spaces  more-numbers
+    # catch EVERY horse line:  post-position  name  weight/odds/numbers
     horses = []
     for line in text.splitlines():
-        # look for:  (1-2 digits)  (capitalised name)  (decimal or integer)
-        m = re.search(r'(?:^|\s)(\d{1,2})\s+([A-Z][A-Z0-9 ]+?)\s+\d+(?:\.\d+)?', line)
+        # 1-2 digits  NAME (words/spaces)  followed by decimal or integer
+        m = re.search(
+            r'(?:^|\s)(\d{1,2})\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]+?)\s+(?=\d+\.?\d*)',
+            line,
+            re.I,
+        )
         if m:
             post, name = m.groups()
             name = name.strip()
-            if len(name) > 3 and name not in {"PRINCESA"}:   # avoid duplicates
+            if len(name) >= 3 and name.lower() not in {"hip", "edad"}:  # skip headers
                 horses.append({"post": int(post), "name": name})
     if horses:
         st.subheader(f"🐎 Found {len(horses)} horses")
@@ -61,4 +66,5 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
