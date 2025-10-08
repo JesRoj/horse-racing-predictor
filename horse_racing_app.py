@@ -42,10 +42,26 @@ if uploaded_file is not None:
             # 1-20 only, no duplicates
             if 1 <= post <= 20 and name.lower() not in seen:
                 # ---- stricter automatic filters ----
+                # ---- final automatic filters ----
                 words = name.split()
-                # rule 1: single short word → jockey/trainer garbage
+                # 1) single short word → garbage
                 if len(words) == 1 and len(name) <= 8:
                     continue
+                # 2) both words short (≤6) → jockey
+                if (len(words) == 2 and
+                    len(words[0]) <= 6 and len(words[1]) <= 6 and
+                    words[0][0].isupper() and words[1][0].isupper()):
+                    continue
+                # 3) second word is a known surname → jockey
+                common_surnames = {
+                    "sánchez", "rodríguez", "garcía", "uzcátegui", "palencia", "petit", "quevedo", "gonzález"
+                }
+                if len(words) == 2 and words[-1].lower() in common_surnames:
+                    continue
+                # 4) last word lowercase → surname
+                if words and words[-1].islower():
+                    continue
+                # ---------------------------------
                 # rule 2: two short capitalised words → jockey  (both ≤ 6)
                 if (len(words) == 2 and
                     len(words[0]) <= 6 and len(words[1]) <= 6 and
@@ -82,6 +98,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
