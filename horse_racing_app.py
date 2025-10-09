@@ -58,10 +58,10 @@ for line in text.splitlines():          #  line 63  –  ‘text’ is now defin
         if tokens[-1].islower():
             return True
         common_surnames = {
-            "sánchez", "rodríguez", "garcía", "uzcátegui", "palencia", "petit",
-            "quevedo", "gonzález", "villamizar", "capriles", "rive", "gonzalez",
-            "gómez", "márquez", "alejandra"
-        }
+    "sánchez", "rodríguez", "garcía", "uzcátegui", "palencia", "petit",
+    "quevedo", "gonzález", "villamizar", "capriles", "rive", "gonzalez",
+    "gómez", "márquez", "alejandra", "trujillo", "correia"
+}
         if tokens[-1].lower() in common_surnames:
             return True
         return False
@@ -107,3 +107,4 @@ if st.button("🔮 Predict race", type="primary"):
         file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
+
