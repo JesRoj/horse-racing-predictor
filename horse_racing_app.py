@@ -22,12 +22,11 @@ if uploaded_file is not None:
 
     st.success(f"Extracted {len(text)} chars from {len(reader.pages)} page(s)")
 
-    # ultra-simple horse grab: lines that start with “H” + digit(s) + “a”
-        # grab post-position + horse name from any line that has
-    #   number(s)  name-with-spaces  more-numbers
-    # catch EVERY horse line:  post-position  name  weight/odds/numbers
+    # ---------- horse parsing starts HERE ----------
     seen = set()
     horses = []
+    for line in text.splitlines():   # line 64 – now 'text' is guaranteed to exist
+        ...
     # ---------- helper ----------
 def _looks_like_jockey(name: str) -> bool:
     """Return True if the token sequence screams ‘jockey’."""
@@ -102,3 +101,4 @@ for line in text.splitlines():
 
         seen.add(name.lower())
         horses.append({"post": post, "name": name})
+
