@@ -75,36 +75,48 @@ for line in text.splitlines():          #  line 63  –  ‘text’ is now defin
 horses.sort(key=lambda x: x["post"])
 
 # ------------------------------------------------------------------
-# 3.  Predict & download
+# 3.  Top-5 win-probability horses + short analysis
 # ------------------------------------------------------------------
 if st.button("🔮 Predict race", type="primary"):
-    # ---- real-form from same line only ----
+    # ---- build stats ----
     for line in text.splitlines():
         for h in horses:
             if h["name"] not in line:
                 continue
-            finishes = [int(n) for n in re.findall(r'\b([1-9]|[1-1]\d|20)\b', line)]
+            finishes = [int(n) for n in re.findall(r'\b([1-9]|1\d|20)\b', line)]
             h["avg_finish"] = sum(finishes[:3]) / 3 if finishes else 5.0
             h["win%"] = round(max(0, 100 - h["avg_finish"] * 5), 1)
-            break          # done for this horse
+            h["runs"] = len(finishes)
+            h["wins"] = finishes.count(1)
+            break
 
-    horses.sort(key=lambda x: x["win%"], reverse=True)
+    # ---- top-5 only ----
+    top5 = sorted(horses, key=lambda x: x["win%"], reverse=True)[:5]
 
-    st.markdown("### 🏆 Real-form prediction")
-    for i, h in enumerate(horses, 1):
+    st.markdown("### 🏆 Top 5 win probabilities")
+    for i, h in enumerate(top5, 1):
         bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
-        st.write(f"{i}. **{h['name']}**  `avg finish {h['avg_finish']:.1f}`  `{h['win%']}%`  \n{bar}")
+        st.write(f"{i}. **{h['name']}**  "
+                 f"`avg finish {h['avg_finish']:.1f}`  "
+                 f"`{h['win%']}%`  \n{bar}")
 
-    # ---- CSV export ----
+    st.markdown("### 📊 Quick analysis")
+    for i, h in enumerate(top5, 1):
+        cons = "very consistent" if h["avg_finish"] <= 3.5 else "steady"
+        if h["wins"]:
+            note = f"has already won {h['wins']} of last {h['runs']} starts"
+        else:
+            note = f"no wins recently but finishes close (avg {h['avg_finish']:.1f})"
+        st.write(f"{i}. **{h['name']}** – {cons}, {note}.")
+
+    # ---- CSV (full list) ----
     csv_lines = ["Rank,Horse,Post,Win%"]
-    for i, h in enumerate(horses, 1):
+    for i, h in enumerate(sorted(horses, key=lambda x: x["win%"], reverse=True), 1):
         csv_lines.append(f"{i},{h['name']},{h['post']},{h['win%']}")
     csv_str = "\n".join(csv_lines)
-
     st.download_button(
-        label="📥 Download CSV",
+        label="📥 Download full CSV",
         data=csv_str,
-        file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
-
