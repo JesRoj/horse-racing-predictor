@@ -28,48 +28,60 @@ if uploaded_file is not None:
     # catch EVERY horse line:  post-position  name  weight/odds/numbers
     seen = set()
     horses = []
-    for line in text.splitlines():
-        m = re.search(
-                    r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?(?:\s+[A-Z][a-z]*){0,2})(?=\s+[A-Z][a-z]+\s+[A-Z][a-z]|\s+\d)',
-                    line,
-                    re.I,
-                )
-        if m:
-            post, name = m.groups()
-            post = int(post)
-            name = name.strip()
+    # ---------- helper ----------
+def _looks_like_jockey(name: str) -> bool:
+    """Return True if the token sequence screams ‘jockey’."""
+    tokens = name.split()
+    if not tokens:
+        return True
 
-            # 1-20 only, no duplicates
-            if 1 <= post <= 20 and name.lower() not in seen:
-                # ---- stricter automatic filters ----
-                # ---- final automatic filters ----
-                # ---- final filters ----
-                words = name.split()
-                # 1) single short word → garbage
-                if len(words) == 1 and len(name) <= 8:
-                    continue
-                # 2) second word is a known surname → jockey
-                common_surnames = {
-                    "sánchez", "rodríguez", "garcía", "uzcátegui", "palencia", "petit",
-                    "quevedo", "gonzález", "villamizar", "capriles", "rive", "gonzalez"
-                }
-                if len(words) == 2 and words[-1].lower() in common_surnames:
-                    continue
-                # 3) lowercase tail → surname
-                if words and words[-1].islower():
-                    continue
-                # 4) deduplicate
-                if name.lower() in seen:
-                    continue
-                # -----------------------
-                # 4) last word lowercase → surname
-                if words and words[-1].islower():
-                    continue
-                # ---------------------------------
-                # rule 2: two short capitalised words → jockey  (both ≤ 6)
-                if (len(words) == 2 and
-                    len(words[0]) <= 6 and len(words[1]) <= 6 and
-                    words[0][0].isupper() and words[1][0].isupper()):
+    # --- 1. single token ≤ 8 and ALL-CAPS → jockey ---
+    if len(tokens) == 1 and len(tokens[0]) <= 8 and tokens[0].isupper():
+        return True
+
+    # --- 2. two tokens, both ≤ 6 and Capitalised → jockey ---
+    if (len(tokens) == 2 and
+        len(tokens[0]) <= 6 and len(tokens[1]) <= 6 and
+        tokens[0][0].isupper() and tokens[1][0].isupper()):
+        return True
+
+    # --- 3. last token is lowercase → surname ---
+    if tokens[-1].islower():
+        return True
+
+    # --- 4. last token in known-surname list ---
+    common_surnames = {
+        "sánchez", "rodríguez", "garcía", "uzcátegui", "palencia", "petit",
+        "quevedo", "gonzález", "villamizar", "capriles", "rive", "gonzalez",
+        "gómez", "márquez", "alejandra"
+    }
+    if tokens[-1].lower() in common_surnames:
+        return True
+
+    return False
+# ----------------------------
+
+for line in text.splitlines():
+    m = re.search(
+        r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}?(?:\s+[A-Z][a-z]*){0,2})(?=\s+[A-Z][a-z]+\s+[A-Z][a-z]|\s+\d)',
+        line, re.I)
+    if not m:
+        continue
+
+    post, name = m.groups()
+    post = int(post)
+    name = name.strip()
+
+    if not (1 <= post <= 20) or name.lower() in seen:
+        continue
+
+    # >>>>>>>  NEW FAST REJECT  <<<<<<<
+    if _looks_like_jockey(name):
+        continue
+    # >>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<
+
+    seen.add(name.lower())
+    horses.append({"post": post, "name": name})
                     continue
                 # rule 3: last word lowercase → surname
                 if words and words[-1].islower():
@@ -110,6 +122,7 @@ if uploaded_file is not None:
                 file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+
 
 
 
