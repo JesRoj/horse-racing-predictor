@@ -15,10 +15,15 @@ if uploaded_file is None:
 # ------------------------------------------------------------------
 # 1.  ALWAYS extract text  (PDF branch shown; TXT/CSV left as exercise)
 # ------------------------------------------------------------------
-reader = PdfReader(io.BytesIO(uploaded_file.read()))
-text = ""
-for page in reader.pages:
-    text += page.extract_text() or ""
+# ---- 5-line OCR drop-in ----
+try:
+    from pytesseract import image_to_string
+    from pdf2image import convert_from_bytes
+    images = convert_from_bytes(uploaded_file.read())
+    text = "\n".join(image_to_string(img, lang='spa') for img in images)
+except Exception as e:
+    st.error("OCR failed → " + str(e))
+    st.stop()
 
 if not text.strip():
     st.error("No readable text found – be sure the PDF contains selectable text.")
@@ -120,3 +125,4 @@ if st.button("🔮 Predict race", type="primary"):
         file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
+
