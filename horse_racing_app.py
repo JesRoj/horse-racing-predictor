@@ -75,7 +75,35 @@ for line in text.splitlines():          #  line 63  –  ‘text’ is now defin
 horses.sort(key=lambda x: x["post"])
 
 # ------------------------------------------------------------------
-# 3.  Predict & download  (keep your original code here)
+# 3.  Predict & download
 # ------------------------------------------------------------------
 if st.button("🔮 Predict race", type="primary"):
-    ...
+    # ---- real-form from same line only ----
+    for line in text.splitlines():
+        for h in horses:
+            if h["name"] not in line:
+                continue
+            finishes = [int(n) for n in re.findall(r'\b([1-9]|[1-1]\d|20)\b', line)]
+            h["avg_finish"] = sum(finishes[:3]) / 3 if finishes else 5.0
+            h["win%"] = round(max(0, 100 - h["avg_finish"] * 5), 1)
+            break          # done for this horse
+
+    horses.sort(key=lambda x: x["win%"], reverse=True)
+
+    st.markdown("### 🏆 Real-form prediction")
+    for i, h in enumerate(horses, 1):
+        bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
+        st.write(f"{i}. **{h['name']}**  `avg finish {h['avg_finish']:.1f}`  `{h['win%']}%`  \n{bar}")
+
+    # ---- CSV export ----
+    csv_lines = ["Rank,Horse,Post,Win%"]
+    for i, h in enumerate(horses, 1):
+        csv_lines.append(f"{i},{h['name']},{h['post']},{h['win%']}")
+    csv_str = "\n".join(csv_lines)
+
+    st.download_button(
+        label="📥 Download CSV",
+        data=csv_str,
+        file_name=f"race_pred_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
