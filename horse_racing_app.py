@@ -73,7 +73,7 @@ if uploaded_file is not None:
             h["market_odds"] = try_float(odds.group(1)) if odds else None
 
             jockey_pct = re.search(r'(\d+)%\s*$', line)
-h["jockey_pct"] = float(jockey_pct.group(1)) if jockey_pct else 12.0
+            h["jockey_pct"] = float(jockey_pct.group(1)) if jockey_pct else 12.0
 
             trainer_pct = re.findall(r'(\d+)%', line)
             h["trainer_pct"] = try_float(trainer_pct[1]) if len(trainer_pct) > 1 else 10.0
@@ -163,4 +163,5 @@ h["jockey_pct"] = float(jockey_pct.group(1)) if jockey_pct else 12.0
             file_name=f"expert_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
             mime="text/csv"
         )
+
 
