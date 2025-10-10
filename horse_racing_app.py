@@ -29,7 +29,7 @@ if uploaded_file is not None:
     seen = set()
     horses = []
     for line in text.splitlines():
-        m = re.search(r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]{4,}(?:\s+[A-Z][a-z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-]*){0,3})(?=\s+\d)', line, re.I)
+        m = re.search(r'(?:^|\s)(1?\d)\s+([A-Z][A-Z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-\.\&\/]{4,}(?:\s+[A-Z0-9][a-z0-9ÁÉÍÓÚÜÑáéíóúüñ\ \(\)\-\.\&\/]*){0,4})(?=\s+(?:\d+[-\s]?kg|\d+cps|\d+\.\d+cps|[A-Z][a-z]+ [A-Z][a-z]+|\d{2,3}\s*mts))', line, re.I)
         if not m:
             continue
         post, name = m.groups()
@@ -161,6 +161,7 @@ if uploaded_file is not None:
             file_name=f"expert_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
             mime="text/csv"
         )
+
 
 
 
