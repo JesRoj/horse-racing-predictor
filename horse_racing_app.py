@@ -94,11 +94,14 @@ if st.button("🔮 Predict race", type="primary"):
             h["runs"] = len(finishes)
             h["wins"] = finishes.count(1)
             break
+            # ---- guarantee keys for every horse ----
+    for h in horses:
+        h.setdefault("avg_finish", 5.0)
+        h.setdefault("win%", 0.0)
+    ranked = sorted(horses, key=lambda x: x["win%"], reverse=True)
 
     # ---- top-5 only ----
-    top5 = sorted([h for h in horses if "win%" in h],
-              key=lambda x: x["win%"], reverse=True)[:5]
-
+    top5 = ranked[:5]
     st.markdown("### 🏆 Top 5 win probabilities")
     for i, h in enumerate(top5, 1):
         bar = "█" * int(h["win%"] / 2) + "░" * (25 - int(h["win%"] / 2))
@@ -118,7 +121,7 @@ if st.button("🔮 Predict race", type="primary"):
     # ---- CSV (full list) ----
     csv_lines = ["Rank,Horse,Post,Win%"]
     ranked = [h for h in horses if "win%" in h]
-for i, h in enumerate(sorted(ranked, key=lambda x: x["win%"], reverse=True), 1):
+for i, h in enumerate(sorted(horses, key=lambda x: x["win%"], reverse=True), 1):
         csv_lines.append(f"{i},{h['name']},{h['post']},{h['win%']}")
 csv_str = "\n".join(csv_lines)
 st.download_button(
@@ -127,6 +130,7 @@ st.download_button(
         file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
+
 
 
 
