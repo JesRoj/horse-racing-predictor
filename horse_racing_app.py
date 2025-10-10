@@ -121,7 +121,7 @@ if st.button("🔮 Predict race", type="primary"):
     # ---- CSV (full list) ----
     csv_lines = ["Rank,Horse,Post,Win%"]
     ranked = [h for h in horses if "win%" in h]
-for i, h in enumerate(sorted(horses, key=lambda x: x["win%"], reverse=True), 1):
+for i, h in enumerate(ranked, 1):
         csv_lines.append(f"{i},{h['name']},{h['post']},{h['win%']}")
 csv_str = "\n".join(csv_lines)
 st.download_button(
@@ -130,6 +130,7 @@ st.download_button(
         file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
+
 
 
 
