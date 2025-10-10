@@ -29,7 +29,7 @@ if not text.strip():
     st.error("No readable text found – be sure the PDF contains selectable text.")
     st.stop()
 
-st.success(f"Extracted {len(text)} characters from {len(reader.pages)} page(s).")
+st.success(f"Extracted {len(text)} characters from PDF.")
 
 # ------------------------------------------------------------------
 # 2.  Horse parsing starts  →  text is **guaranteed** to exist
@@ -125,4 +125,5 @@ if st.button("🔮 Predict race", type="primary"):
         file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
+
 
