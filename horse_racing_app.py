@@ -96,7 +96,8 @@ if st.button("🔮 Predict race", type="primary"):
             break
 
     # ---- top-5 only ----
-    top5 = sorted(horses, key=lambda x: x["win%"], reverse=True)[:5]
+    top5 = sorted([h for h in horses if "win%" in h],
+              key=lambda x: x["win%"], reverse=True)[:5]
 
     st.markdown("### 🏆 Top 5 win probabilities")
     for i, h in enumerate(top5, 1):
@@ -125,5 +126,6 @@ if st.button("🔮 Predict race", type="primary"):
         file_name=f"race_pred_{datetime.now():%Y%m%d_%H%M%S}.csv",
         mime="text/csv"
     )
+
 
 
